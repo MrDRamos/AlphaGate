@@ -1,0 +1,194 @@
+
+My log of creating an Ubunto 16.04.5 server in Azure with machine lerning tools installed. 
+Azure has a preconfigured VM image called "fast.ai". The ARM template for this linux VM
+contains a special Extention named FastIA which installs all the ML tools after the VM is provisioned.
+
+References:
+Build your own deep learning models on Azure Data Science Virtual Machines (Using FastAI extention/image)
+https://azure.microsoft.com/en-us/blog/fastai-on-azure-dsvm/
+
+Cheeper Premeeptible DSVM's
+https://portal.azure.com/#create/Microsoft.Template
+
+FastAI extention ARM tamplaate:
+https://raw.githubusercontent.com/Azure/DataScienceVM/master/Extensions/fastaiv1/azuredeployLinux.json
+
+
+###############
+#) Provisioning the Linux (Ubuntu) edition of DSVM with fast.ai
+Start the VM provisioning: http://aka.ms/dsvm/fastai
+This will take about 20min.
+
+VM Size:
+The standard VM is is NC6 with an 
+  - NVidia Tesla K80 GPU, 
+  - 6 CPU 
+  - 56 GB memory,
+  - Extra 100GB Data disk.
+This is a very high poward & expensive VM, Make sure to turn it off from the portal when it is not used.
+The smaller platform is: a D4s_v3 with 4 CPU or even smaller E2s_v3 with 2 CPU
+GPU VM: https://docs.microsoft.com/en-us/azure/virtual-machines/windows/sizes-gpu
+CPU VM: https://azure.microsoft.com/en-us/blog/introducing-the-new-dv3-and-ev3-vm-sizes/
+NVidia Tesla K80 GPU @Amazon %500,- ... $2000,-
+
+Port:
+Allow access to he SSH RDP Ports:
+SSH Port= 22
+RDP port= 3389
+RDP port= 3350 <- xRDP was asking for this. Not sure if was actually needed
+
+
+###############
+#) SSH into the VM with Putty and verify installed features:
+alpha@dsvm-ub2:~$ lsb_release -a
+No LSB modules are available.
+Distributor ID: Ubuntu
+Description:    Ubuntu 16.04.5 LTS
+Release:        16.04
+Codename:       xenial
+
+alpha@dsvm-ub2:~$ conda --version
+conda 4.5.11
+
+alpha@dsvm-ub2:~$  conda list
+... many more ...
+numpy                     1.14.6
+numpy                     1.14.5 
+tensorboard               1.12.0
+tensorflow-gpu            1.12.0
+
+#Verify NVIDIA-GPU installation:
+alpha@dsvm-ub2:~$ nvidia-smi
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 396.44                 Driver Version: 396.44                    |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|===============================+======================+======================|
+|   0  Tesla K80           On   | 0000506D:00:00.0 Off |                    0 |
+| N/A   37C    P0    56W / 149W |      0MiB / 11441MiB |      1%      Default |
++-------------------------------+----------------------+----------------------+
+
+
+###############
+#) Setup for XTerm GUI access via standard a RDP connection.
+- Install xRDP networking protocol libray 
+- Install XTerm desktop enviroment: XFCE4   https://draculaservers.com/tutorials/ubuntu-18-xrdp/
+
+References:
+How to use xRDP for remote access to Ubuntu
+https://www.tweaking4all.com/software/linux-software/use-xrdp-remote-access-ubuntu-14-04/
+
+xRDP to Ubuntu
+https://askubuntu.com/questions/592537/can-i-access-ubuntu-from-windows-remotely
+
+SMB share for Ubuntu
+https://www.ubuntufree.com/how-to-share-ubuntu-files-with-windows/
+
+
+
+sudo apt-get update
+sudo apt-get install xrdp
+
+#Install Your Preferred Desktop Environment (Note: The DSVM already had this installed 4.12.2)
+sudo apt-get install xfce4
+
+# Create .xsession config file
+echo xfce4-session > ~/.xsession
+
+# Edit: /etc/xrdp/startwm.sh - so that xRDP uses Xfce4: See last line:
+sudo nano /etc/xrdp/startwm.sh
+    #!/bin/sh
+
+    if [ -r /etc/default/locale ]; then
+      . /etc/default/locale
+      export LANG LANGUAGE
+    fi
+
+    startxfce4
+
+# Disable the behaviour of tab changing windows. This is done in the file 
+nano ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml 
+# by changing the line
+  <property name="&lt;Super&gt;Tab" type="string" value="switch_window_key"/>
+to
+  <property name="&lt;Super&gt;Tab" type="empty"/>
+
+# Restart xRDP
+sudo service xrdp restart
+
+# -- Try this instead of editing xfce4-keyboard-shortcuts.xml
+# Open the Xfce Application Menu > Settings > Window Manager
+# Click on the Keyboard Tab
+# Clear the Switch window for same application setting
+
+###############
+#) Finnaly connect with RDP:
+# Note: The environment variables are set up differently when logging in with SSH (=interactive login)
+# vs loging into the XFCE4 XTerm desktop GUI (Non-Interactive shell). WHen opening an XTerm emulater run 
+bash -logim
+# This will source in additional .sh files to set up the FastAI environment e.g. conda ...
+
+
+###############
+#) To remove xfce4:
+sudo apt purge xfce4
+sudo apt autoremove
+
+
+###############
+#) Shut down Ubuntu << Azure will still incure VM costs. Go to the portal to stop-deactivate it completely
+sudo poweroff
+
+#) Restart Ubuntu
+sudo reboot
+
+
+###############
+#) Install VsCode editor On Linux: https://code.visualstudio.com/docs/setup/linux
+curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
+
+
+###############
+#) Install Powershell Core On Ubuntu 16.04
+https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-linux?view=powershell-6#ubuntu-1604
+1) Using Debian package repositories 
+# Download the Microsoft repository GPG keys
+wget -q https://packages.microsoft.com/config/ubuntu/16.04/packages-microsoft-prod.deb
+
+# Register the Microsoft repository GPG keys
+sudo dpkg -i packages-microsoft-prod.deb
+
+# Update the list of products
+sudo apt-get update
+
+# Install PowerShell
+sudo apt-get install -y powershell
+
+# Start PowerShell
+pwsh
+
+2) Using curl to explictly download repo
+# Import the public Microsoft repository GPG keys
+curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+
+# Register the Microsoft Ubuntu repository
+curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
+
+# Update the list of products
+sudo apt-get update
+
+# Install PowerShell
+sudo apt-get install -y powershell
+
+# Start PowerShell (MS renamed main executable at launch to be more Linux-like)
+pwsh
+
+# After registering the Microsoft repository once as superuser, from then on, you just need to use 
+# sudo apt-get upgrade powershell to update it.
+
+
+###############
+#) Change Xterm to start with Black background
+
+

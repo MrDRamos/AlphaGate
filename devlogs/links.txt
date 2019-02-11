@@ -1,0 +1,16 @@
+
+
+ALphaPilot Updates
+https://www.herox.com/alphapilot/updates
+
+Test #2 – Machine Vision
+https://www.herox.com/alphapilot/77-test-2
+
+Test #3 – Guidance, Navigation & Control
+https://www.herox.com/alphapilot/update/2595
+
+GitHub - AlphaGate
+https://github.com/MrDRamos/AlphaGate
+
+AlphaGate Repo:
+https://github.com/MrDRamos/AlphaGate.git

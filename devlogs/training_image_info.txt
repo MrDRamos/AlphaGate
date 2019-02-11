@@ -1,0 +1,50 @@
+Data_Training
+Count            = 9339 jpg files
+Image file names = IMG_####.jpg"
+Image Dimentions = 1296 x 864 = (9*9 * 4*4) x (3*3*3 * 2*4*4)
+
+Notable images:
+Small: 
+0537
+3146
+3592
+3586
+3542
+9987
+
+Large:
+2278
+3148
+9317
+9349
+
+Angled
+0711
+0712
+0899
+1176
+1193
+1432
+1820 & small
+4756
+9180 & Glare
+
+Blurry
+0362
+4739
+
+Blocked
+0053
+0421
+0562
+0897
+0976
+0977
+0978
+0979
+0981
+0982
+1342
+1343
+1344
+
