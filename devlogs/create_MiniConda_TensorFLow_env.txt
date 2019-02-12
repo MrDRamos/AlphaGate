@@ -4,6 +4,7 @@
 # The varius Conda installation packages are all found in the AnaConda 
 # Package Repository: https://anaconda.org/anaconda/repo
 # I was able to set up the environment in 30 min.
+$ The disk space used by the tf environment after installing all the packages was 1.7GB 
 
 #) Download MiniConda installer for Python 3.7: 
 # https://docs.conda.io/en/latest/miniconda.html
@@ -14,15 +15,17 @@ Miniconda3-latest-Windows-x86_64.exe
 
 #) Launch a Conda command prompt (that contains all the conda environment settings)
 #  Launch from the start menu, or create a batch file to launch a Conda command prompt:
-@ECHO off
-set CONDA_PREFIX=C:\Apps\MiniConda
-%windir%\System32\cmd.exe "/K" %CONDA_PREFIX%\Scripts\activate.bat %CONDA_PREFIX%
+(
+echo @ECHO off
+echo set CONDA_PREFIX=C:\Apps\MiniConda
+echo %windir%\System32\cmd.exe "/K" %CONDA_PREFIX%\Scripts\activate.bat %CONDA_PREFIX%
+) > AnaConda.bat
 
-#) Install Python 3.5.3 in a new Conda environment: tf
-conda create -n tf python=3.5.2
+#) Install Python 3.5.6 in a new Conda environment: tf
+conda create -n tf python=3.5
 conda activate tf
 
-#) Install tensorflow 1.12.0 & tensorboard
+#) Install tensorflow & tensorboard
 # CPU:  
 conda install -c anaconda tensorflow
 # GPU:  
@@ -33,6 +36,7 @@ conda install -c anaconda tensorflow-gpu
 conda install pylint
 # Remember VsCode needs to be told which Conda Environment to activate:
 # Start VsCode Settings: <Ctrl><shift>p  and enter: Python: Select Interpreter
+# The select pylint as the linter
 
 #) needed by submit/helper.ph
 conda install matplotlib
@@ -40,13 +44,10 @@ conda install matplotlib
 #) needed by score/score.py
 conda install shapely
 
-#) cython compiler from conda-forge: https://github.com/conda-forge/cython-feedstock
-conda config --add channels conda-forge
+#) cython compiler
 conda install cython
 
-#) opencv image processing library  3.4.4 
-# from conda-forge: https://github.com/conda-forge/opencv-feedstock
-conda config --add channels conda-forge
+#) opencv image processing library
 conda install opencv
 
 
@@ -57,71 +58,73 @@ conda list
 # packages in environment at C:\Apps\Miniconda\envs\tf-gpu:
 #
 # Name                    Version                   Build  Channel
-_tflow_1100_select        0.0.1                       gpu    anaconda
+# Name                    Version                   Build  Channel
+_tflow_1100_select        0.0.2                     eigen    anaconda
 absl-py                   0.4.1                    py35_0    anaconda
 astor                     0.7.1                    py35_0    anaconda
-astroid                   2.0.3                    py35_0    conda-forge
+astroid                   2.0.4                    py35_0
 blas                      1.0                         mkl    anaconda
-ca-certificates           2018.11.29           ha4d7672_0    conda-forge
-certifi                   2018.8.24             py35_1001    conda-forge
-colorama                  0.4.1                      py_0    conda-forge
-cudatoolkit               9.0                           1    anaconda
-cudnn                     7.1.4                 cuda9.0_0    anaconda
-cycler                    0.10.0                     py_1    conda-forge
-cython                    0.28.5           py35h6538335_0    conda-forge
-freetype                  2.9.1             h5db478b_1005    conda-forge
+ca-certificates           2019.1.23                     0
+certifi                   2018.8.24                py35_1
+colorama                  0.3.9            py35h32a752f_0
+cycler                    0.10.0           py35hcc71164_0
+cython                    0.28.5           py35h6538335_0
+freetype                  2.9.1                ha9979f8_1
 gast                      0.2.0                    py35_0    anaconda
-geos                      3.6.2             he025d50_1004    conda-forge
+geos                      3.6.2                h9ef7328_2
 grpcio                    1.12.1           py35h1a1b453_0    anaconda
+hdf5                      1.8.20               hac2f561_1
 icc_rt                    2019.0.0             h0cc432a_1    anaconda
 icu                       58.2                 ha66f8fd_1
 intel-openmp              2019.1                      144    anaconda
-isort                     4.3.4                    py35_0    conda-forge
-jpeg                      9c                hfa6e2cd_1001    conda-forge
-kiwisolver                1.0.1            py35he980bc4_2    conda-forge
-lazy-object-proxy         1.3.1            py35hfa6e2cd_0    conda-forge
-libpng                    1.6.36            h7602738_1000    conda-forge
+isort                     4.3.4                    py35_0
+jpeg                      9b                   hb83a4c4_2
+kiwisolver                1.0.1            py35h6538335_0
+lazy-object-proxy         1.3.1            py35hfa6e2cd_2
+libopencv                 3.4.2                h20b85fd_0
+libpng                    1.6.36               h2a8f88b_0
 libprotobuf               3.6.0                h1a1b453_0    anaconda
-libtiff                   4.0.10            h36446d0_1001    conda-forge
-libwebp                   0.5.2                         7    conda-forge
+libtiff                   4.0.10               hb898794_2
 markdown                  2.6.11                   py35_0    anaconda
-matplotlib                2.2.3            py35h31860fd_0    conda-forge
-mccabe                    0.6.1                      py_1    conda-forge
+matplotlib                3.0.0            py35hd159220_0
+mccabe                    0.6.1                    py35_1
 mkl                       2019.1                      144    anaconda
 mkl_fft                   1.0.6            py35hdbbee80_0    anaconda
 mkl_random                1.0.1            py35h77b88f5_1    anaconda
 numpy                     1.15.2           py35ha559c80_0    anaconda
 numpy-base                1.15.2           py35h8128ebf_0    anaconda
-opencv                    3.4.3           py35h597e314_200    conda-forge
-openssl                   1.0.2p            hfa6e2cd_1002    conda-forge
-pip                       18.0                  py35_1001    conda-forge
+opencv                    3.4.2            py35h40b0b35_0
+openssl                   1.1.1a               he774522_0
+pip                       10.0.1                   py35_0
 protobuf                  3.6.0            py35he025d50_0    anaconda
-pylint                    2.1.1                    py35_0    conda-forge
-pyparsing                 2.3.1                      py_0    conda-forge
-pyqt                      5.6.0                    py35_2
-python                    3.5.2                         5    conda-forge
-python-dateutil           2.8.0                      py_0    conda-forge
-pytz                      2018.9                     py_0    conda-forge
-qt                        5.6.2                h2639256_8    conda-forge
-setuptools                40.4.3                   py35_0    conda-forge
-shapely                   1.6.4            py35hc90234e_1    conda-forge
-sip                       4.19.8          py35h6538335_1000    conda-forge
+py-opencv                 3.4.2            py35hc319ecb_0
+pylint                    2.1.1                    py35_0
+pyparsing                 2.2.1                    py35_0
+pyqt                      5.9.2            py35h6538335_2
+python                    3.5.6                he025d50_0
+python-dateutil           2.7.3                    py35_0
+pytz                      2018.5                   py35_0
+qt                        5.9.7            vc14h73c81de_0
+setuptools                40.2.0                   py35_0
+shapely                   1.6.4            py35hc90234e_0
+sip                       4.19.8           py35h6538335_0
 six                       1.11.0                   py35_1    anaconda
-sqlite                    3.26.0            hfa6e2cd_1000    conda-forge
+sqlite                    3.26.0               he774522_0
 tensorboard               1.10.0           py35he025d50_0    anaconda
-tensorflow                1.10.0          gpu_py35ha5d5ef7_0    anaconda
-tensorflow-base           1.10.0          gpu_py35h6e53903_0    anaconda
-tensorflow-gpu            1.10.0               hf154084_0    anaconda
+tensorflow                1.10.0          eigen_py35h38c8211_0    anaconda
+tensorflow-base           1.10.0          eigen_py35h45df0d8_0    anaconda
 termcolor                 1.1.0                    py35_1    anaconda
-tornado                   5.1.1            py35hfa6e2cd_0    conda-forge
-typed-ast                 1.1.0                    py35_0    conda-forge
+tornado                   5.1.1            py35hfa6e2cd_0
+typed-ast                 1.1.0            py35hfa6e2cd_0
 vc                        14.1                 h21ff451_3    anaconda
 vs2015_runtime            15.5.2                        3    anaconda
 werkzeug                  0.14.1                   py35_0    anaconda
-wheel                     0.32.0                py35_1000    conda-forge
-wincertstore              0.2                   py35_1002    conda-forge
-wrapt                     1.10.11          py35hfa6e2cd_1    conda-forge
+wheel                     0.31.1                   py35_0
+wincertstore              0.2              py35hfebbdb8_0
+wrapt                     1.10.11          py35hfa6e2cd_2
+xz                        5.2.4                h2fa13f4_4
 zlib                      1.2.11               h62dcd97_3    anaconda
+zstd                      1.3.7                h508b16e_0
 #===============================================================================
 
 
