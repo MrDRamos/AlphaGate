@@ -1,0 +1,77 @@
+=========================      2-Days to Demo     =========================
+NVIDIA - Two Days to a Demo
+https://developer.nvidia.com/embedded/twodaystoademo
+
+NV.dram0s
+Use your API key to log in to the NGC registry as follows.
+For the username, enter '$oauthtoken' exactly as shown. It is a special authentication token for all users.
+API Key: ZXFwMjhvbTNibm5lc2RxN2lhZDIzcDBnbW86NDZkMjkxMmYtN2ZiYy00OGIyLWJhZDctOGNkMjRkYmZlZjY5
+         
+Nvidia - Digits docker image
+https://ngc.nvidia.com/catalog/containers/nvidia%2Fdigits
+
+Pull command:
+docker pull nvcr.io/nvidia/digits:18.12-tensorflow
+
+Install NVIDIA GPU drivers on N-series VMs running Linux
+https://docs.microsoft.com/en-us/azure/virtual-machines/linux/n-series-driver-setup
+
+NVIDIA GPU Driver Extension for Linux
+https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/hpccompute-gpu-linux
+
+Troubleshoot deploying Linux virtual machine issues in Azure
+https://docs.microsoft.com/en-us/azure/virtual-machines/troubleshooting/troubleshoot-deploy-vm-linux
+
+Use the Azure portal to restore virtual machines
+https://docs.microsoft.com/en-us/azure/backup/backup-azure-arm-restore-vms
+
+* Installing NVIDIA Drivers
+https://docs.nvidia.com/ngc/ngc-titan-setup-guide/index.html
+
+* Provision the Data Science Virtual Machine for Linux (Ubuntu) - Includes Digits
+https://docs.microsoft.com/en-us/azure/machine-learning/data-science-virtual-machine/dsvm-ubuntu-intro
+
+Provision a Deep Learning Virtual Machine on Azure (DLVM)- & configure X2Go 
+https://docs.microsoft.com/en-us/azure/machine-learning/data-science-virtual-machine/provision-deep-learning-dsvm
+---
+sudo apt-get install -y apt-transport-https curl
+
+cat <<EOF | sudo tee /etc/apt/sources.list.d/cuda.list > /dev/null
+deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /
+EOF
+
+curl -s https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub | sudo apt-key add -
+
+cat <<EOF | sudo tee /etc/apt/preferences.d/cuda > /dev/null
+Package: *
+Pin: origin developer.download.nvidia.com
+Pin-Priority: 600
+EOF
+
+sudo apt-get update && sudo apt-get install -y --no-install-recommends cuda-drivers
+sudo reboot
+---
+CLI command to update the Linux kernel and installs a specific CUDA toolkit version driver:
+Set-AzureRmVMExtension `
+    -ResourceGroupName "alpha_0" `
+    -VMName "ub2" `
+    -Location "EastUS2" `
+    -Publisher "Microsoft.HpcCompute" `
+    -ExtensionName "NvidiaGpuDriverLinux" `
+    -ExtensionType "NvidiaGpuDriverLinux" `
+    -TypeHandlerVersion 1.2 `
+    -SettingString '{ }'
+sudo apt install nvidia-410
+sudo apt install nvidia-utils-410
+sudo apt install nvidia-utils-390
+sudo apt autoremove
+sudo apt --fix-broken install
+
+sudo apt install nvidia-390
+sudo apt install nvidia-utils-390
+sudo apt-get remove nvidia-390
+sudo apt-get --purge remove nvidia-390
+
+sudo apt install nvidia-340
+sudo apt install nvidia-utils-390
+

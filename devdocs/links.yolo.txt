@@ -1,0 +1,38 @@
+------------------------------- YOLO -------------------------------
+Yolo Paper
+https://pjreddie.com/media/files/papers/YOLOv3.pdf
+
+Yolo Darknet
+https://pjreddie.com/darknet/yolo/
+
+Yolo Links:
+How to implement a YOLO (v3) object detector from scratch - With theory explained !!
+https://blog.paperspace.com/how-to-implement-a-yolo-object-detector-in-pytorch/
+
+Implementing YOLO v3 in Tensorflow (TF-Slim)
+https://itnext.io/implementing-yolo-v3-in-tensorflow-tf-slim-c3c55ff59dbe
+https://github.com/mystic123/tensorflow-yolo-v3
+
+YOLOv3 in Tensorflow
+https://medium.com/@shahkaran76/yolo-object-detection-algorithm-in-tensorflow-e080a58fa79b
+
+TINY YOLO v3 model in tensorflow
+https://github.com/khanhhnn/tiny-yolo-tensorflow
+
+Windows and Linux version of Darknet Yolo v3 & v2 Neural Networks for object detection (Tensor Cores are used)
+https://github.com/AlexeyAB/darknet
+
+A Keras implementation of YOLOv3 (Tensorflow backend)
+https://github.com/qqwweee/keras-yolo3
+
+YOLO v3 and Tiny YOLO v1, v2, v3 with Tensorflow.js
+https://github.com/shaqian/tfjs-yolo
+
+tfjs-tiny-yolov2
+https://github.com/justadudewhohacks/tfjs-tiny-yolov2
+
+How to train YOLOv3 to detect custom objects
+https://medium.com/@manivannan_data/how-to-train-yolov3-to-detect-custom-objects-ccbcafeb13d2
+
+k-means clustering
+https://en.wikipedia.org/wiki/K-means_clustering

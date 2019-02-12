@@ -1,0 +1,15 @@
+
+
+NVIDIA - RedTail: Autonomous visual navigation components for drones
+https://github.com/NVIDIA-AI-IOT/redtail
+https://dronelife.com/2017/09/07/nvidias-redtail-demonstrating-trailblazing-ai-drones-flying-trails/
+
+Wiki SLAM - simultaneous localization and mapping 
+https://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping
+
+SLAM basics - for beginners
+https://www.mrpt.org/tutorials/slam-algorithms/slam-simultaneous-localization-and-mapping-for-beginners-the-basics/
+
+Drone - RUNCAM RACER FPV CAMERA
+https://oscarliang.com/runcam-racer-fpv-camera/
+https://oscarliang.com/best-fpv-camera-quadcopter/#fov
