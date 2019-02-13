@@ -45,6 +45,9 @@ Google's Machine Learning Crash Course:
 https://developers.google.com/machine-learning/crash-course/
 https://colab.research.google.com/notebooks/mlcc/intro_to_neural_nets.ipynb?utm_source=mlcc&utm_campaign=colab-external&utm_medium=referral&utm_content=introneuralnets-colab&hl=en
 
+ML Practicum: Image Classification
+https://developers.google.com/machine-learning/practica/image-classification/
+
 Neural Networks: Programming Exercise
 https://developers.google.com/machine-learning/crash-course/introduction-to-neural-networks/programming-exercise
 
@@ -60,6 +63,7 @@ https://tensorflow.rstudio.com/tfestimators/articles/layers.html
 Colaboratory – MNist example
 https://colab.research.google.com/notebooks/mlcc/multi-class_classification_of_handwritten_digits.ipynb?utm_source=mlcc&utm_campaign=colab-external&utm_medium=referral&utm_content=multiclass-colab&hl=en
 
+
 ===========================================================================
 							OpemCv Build Tools
 ===========================================================================
@@ -73,6 +77,8 @@ https://docs.opencv.org/master/d3/d52/tutorial_windows_install.html
 
 Opencv - Haar Feature-based Cascade Classifier for Object Detection
 https://docs.opencv.org/2.4/modules/objdetect/doc/cascade_classification.html
+Ref: Empirical Analysis of Detection Cascades of Boosted Classifiers for Rapid Object Detection
+http://www.multimedia-computing.de/mediawiki//images/5/52/MRL-TR-May02-revised-Dec02.pdf
 
 Eigen - Matric Match Library
 http://eigen.tuxfamily.org/index.php?title=Main_Page
