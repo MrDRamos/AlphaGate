@@ -57,7 +57,8 @@ https://www.tensorflow.org/tutorials/estimators/cnn
 TensorFlow Layers - MNist example
 https://tensorflow.rstudio.com/tfestimators/articles/layers.html
 
-
+Colaboratory – MNist example
+https://colab.research.google.com/notebooks/mlcc/multi-class_classification_of_handwritten_digits.ipynb?utm_source=mlcc&utm_campaign=colab-external&utm_medium=referral&utm_content=multiclass-colab&hl=en
 
 ===========================================================================
 							OpemCv Build Tools
