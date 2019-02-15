@@ -2,6 +2,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+import os
 import tensorflow as tf
 import numpy as np
 
@@ -85,8 +86,31 @@ train_data = train_data/np.float32(255)
 train_labels = train_labels.astype(np.int32)  # not required
 
 eval_data = eval_data/np.float32(255)
-eval_labels = eval_labels.astype(np.int32)  # not required
 
+#
+print("----- Test -----")
+from matplotlib import pyplot as plt
+img_idx = 1
+img_data = train_data[img_idx]
+print("Shape: ", img_data.shape)
+_, ax = plt.subplots()
+ax.matshow(img_data)
+ax.set_title("Label: %i" % train_labels[img_idx])
+ax.grid(True)
+plt.show()
+
+plt_rows = 1
+plt_cols = 2
+fig, axes = plt.subplots(plt_rows, plt_cols) #, figsize=(20, 2 * num_rows))
+for ax in axes.ravel():
+    ax.matshow(train_data[img_idx])
+    ax.set_title("Label: %i" % train_labels[img_idx])
+    ax.grid(True)
+    img_idx += 1
+
+plt.show()
+os._exit(0)
+# 
 # Create the Estimator
 mnist_classifier = tf.estimator.Estimator(
     model_fn=cnn_model_fn, model_dir="/tmp/mnist_convnet_model")
@@ -110,7 +134,7 @@ print("----- Train 1 step -----")
 mnist_classifier.train(input_fn=train_input_fn, steps=1, hooks=[logging_hook])
 
 # Now—without logging each step—set steps=1000 to train the model longer
-print("----- Train 1000 steps -----")
+print("----- Train 1000 steps, batch sieze= 100 -----")
 mnist_classifier.train(input_fn=train_input_fn, steps=1000)
 
 # Once training is complete, we want to evaluate our model to determine its accuracy on the MNIST test set.
@@ -124,4 +148,3 @@ print("----- Foward Pass Evaluation -----")
 eval_results = mnist_classifier.evaluate(input_fn=eval_input_fn)
 print("----- Final Evaluateion Reults -----")
 print(eval_results)
-
