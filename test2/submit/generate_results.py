@@ -9,10 +9,15 @@ import numpy as np
 
 
 class GenerateFinalDetections():
+    Foo_Enable = False
     def __init__(self):
+        self.Foo_Enable = True
         self.seed = 2018
         
-    def predict(self,img):
+    def predict(self,img,img_name="na"):
+        #if self.Foo_Enable:
+            # do something
+
         np.random.seed(self.seed)
         n_boxes = np.random.randint(4)
         if n_boxes>0:

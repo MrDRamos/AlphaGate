@@ -17,7 +17,7 @@ def plot_bbox(img,bbox,color='c'):
                  [y1,y2,y3,y4,y1],
                  color=color,linewidth=3
                 )
-    plt.axis('off');
+    plt.axis('off')
     
 def plot_GT_pred(img,bbox,lbl,bbox_gt,color='c',color_gt ='g'):
     plt.imshow(img)
@@ -51,4 +51,4 @@ def plot_GT_pred(img,bbox,lbl,bbox_gt,color='c',color_gt ='g'):
                  [y1,y2,y3,y4,y1],
                  color=color_gt,linewidth=2
                 )
-    plt.axis('off');
+    plt.axis('off')

@@ -37,6 +37,7 @@ def cnn_model_fn(features, labels, mode):
 
   # Dense Layer
   pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64])
+  # dense: Output tensor has same shape as inputs except the last dimension is of size units.
   dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
   dropout = tf.layers.dropout(
       inputs=dense, rate=0.4, training=mode == tf.estimator.ModeKeys.TRAIN)
@@ -97,18 +98,18 @@ _, ax = plt.subplots()
 ax.matshow(img_data)
 ax.set_title("Label: %i" % train_labels[img_idx])
 ax.grid(True)
-plt.show()
+plt.show(block=False)
 
 plt_rows = 1
 plt_cols = 2
-fig, axes = plt.subplots(plt_rows, plt_cols) #, figsize=(20, 2 * num_rows))
+fig, axes = plt.subplots(plt_rows, plt_cols)
 for ax in axes.ravel():
     ax.matshow(train_data[img_idx])
     ax.set_title("Label: %i" % train_labels[img_idx])
     ax.grid(True)
     img_idx += 1
 
-plt.show()
+plt.show() # = #plt.show(block=True)
 os._exit(0)
 # 
 # Create the Estimator
