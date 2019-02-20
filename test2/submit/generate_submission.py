@@ -20,6 +20,9 @@ data_ofs = 0
 data_ofs = img_keys.index('IMG_0013.JPG') 
 #data_ofs = img_keys.index('IMG_0013.JPG') 
 #data_ofs = img_keys.index('IMG_3565.JPG') # small
+#data_ofs = img_keys.index('IMG_4443.JPG') # + ladders
+data_ofs = img_keys.index('IMG_4746.JPG') # + ladders + glare + angle
+
 train_qty = 6
 Validate_qty = 2
 img_key_train = img_keys[data_ofs : data_ofs + train_qty]
@@ -122,7 +125,39 @@ if DoCorner:
     idx = 0
     for img_key in img_key_train:
         img =cv2.imread(image_dir + img_key)
+### Histogram Equalization
+# https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_histograms/py_histogram_equalization/py_histogram_equalization.html       
+        """
+        img_hls = cv2.cvtColor(img,cv2.COLOR_BGR2HLS)
+        h,l,s = cv2.split(img_hls)
+        leq = cv2.equalizeHist(l)
+        hls_eq = cv2.merge((h,leq,s))
+        img_eq = cv2.cvtColor(hls_eq,cv2.COLOR_HLS2BGR)
+
+        plt.subplot(1,2,1), plt.imshow(img)
+        plt.subplot(1,2,2), plt.imshow(img_eq)
+        plt.show()
+
+        plt.subplot(1,2,1), plt.hist(l.flatten(),256,[0,256], color = 'b')
+        plt.subplot(1,2,2), plt.hist(leq.flatten(),256,[0,256], color = 'r')
+        plt.show()
+        #hist,bins = np.histogram(img.flatten(),256,[0,256])
+        """
+        # CLAHE adaptive histogram equalization         
+        img_hls = cv2.cvtColor(img,cv2.COLOR_BGR2HLS)
+        h,l,s = cv2.split(img_hls)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        leq = clahe.apply(l)
+        hls_eq = cv2.merge((h,leq,s))
+        img_eq = cv2.cvtColor(hls_eq, cv2.COLOR_HLS2BGR)
+
+        plt.subplot(1,2,1), plt.imshow(img)
+        plt.subplot(1,2,2), plt.imshow(img_eq)
+        plt.show()
+        img = img_eq
+###
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+
         img_dxmin, img_dxmax = Grad_NegPos(gray, Horizontal=True, UseScharr= False)
         img_dymin, img_dymax = Grad_NegPos(gray, Horizontal=False, UseScharr= False)
 
