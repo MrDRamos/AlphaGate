@@ -3,7 +3,6 @@
 # Miniconda contains the conda package manager and Python & nothing else.
 # The varius Conda installation packages are all found in the AnaConda 
 # Package Repository: https://anaconda.org/anaconda/repo
-# I was able to set up the environment in 30 min.
 $ The disk space used by the tf environment after installing all the packages was 1.7GB 
 
 #) Download MiniConda installer for Python 3.7: 
@@ -18,12 +17,25 @@ Miniconda3-latest-Windows-x86_64.exe
 (
 echo @ECHO off
 echo set CONDA_PREFIX=C:\Apps\MiniConda
-echo %windir%\System32\cmd.exe "/K" %CONDA_PREFIX%\Scripts\activate.bat %CONDA_PREFIX%
+%CONDA_PREFIX%\Scripts\activate.bat %CONDA_PREFIX%
 ) > AnaConda.bat
 
 #) Install Python 3.5.6 in a new Conda environment: tf
+#) NoteL There is a bug in windows version of matplotlib and python 3.5.6 that Conda is not aware of.
+#) It fixed in newer versions of matplotlib 3.0.1+ but they require python 3.6.8
+AnaConda.bat
 conda create -n tf python=3.5
+#conda create -n tf python=3.6  # <-- for Windows
 conda activate tf
+
+##### Install additional packages commonly used #####
+#) Packages needed by vscode editor:
+conda install -c anaconda pylint
+conda install -c anaconda autopep8
+# Remember VsCode needs to be told which Conda Environment to activate:
+# Start VsCode Settings: <Ctrl><shift>p  and enter: Python: Select Interpreter
+# The select pylint as the linter
+
 
 #) Install tensorflow & tensorboard
 # CPU:  
@@ -31,25 +43,20 @@ conda install -c anaconda tensorflow
 # GPU:  
 conda install -c anaconda tensorflow-gpu
 
-##### Install additional packages commonly used #####
-#) needed by vscode editor
-conda install pylint
-# Remember VsCode needs to be told which Conda Environment to activate:
-# Start VsCode Settings: <Ctrl><shift>p  and enter: Python: Select Interpreter
-# The select pylint as the linter
-
 #) needed by submit/helper.ph
-conda install matplotlib
+conda install -c anaconda matplotlib
 
 #) needed by score/score.py
-conda install shapely
+conda install -c anaconda shapely
 
 #) cython compiler
-conda install cython
+conda install -c anaconda cython
 
 #) opencv image processing library
-conda install opencv
+conda install -c anaconda opencv
 
+#) Intall all packages with one command:
+conda install -c anaconda pylint autopep8 tensorflow matplotlib shapely cython opencv
 
 #===============================================================================
 #The resulting list of installed packages
