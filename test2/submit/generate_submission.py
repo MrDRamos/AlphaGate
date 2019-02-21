@@ -44,6 +44,7 @@ def ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues = False):
         u8Array = np.uint8(tmp)
     return u8Array
 
+
 def Split_FloatToU8(SrcArray):
     fstat = cv2.minMaxLoc(SrcArray)
     MaxFloat = max(fstat[1], -fstat[0])    
@@ -51,7 +52,8 @@ def Split_FloatToU8(SrcArray):
     pos_U8 = ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues= False)
     return neg_U8,pos_U8 
 
-def Grad_NegPos(img, Horizontal=True, ksize=3, UseScharr= False):
+
+def Sobel_SplitPosNeg(img, Horizontal=True, ksize=3, UseScharr= False):
     # https://docs.opencv.org/2.4/modules/imgproc/doc/filtering.html?highlight=sobel#cv2.Sobel
     if UseScharr:
         if Horizontal:
@@ -62,8 +64,7 @@ def Grad_NegPos(img, Horizontal=True, ksize=3, UseScharr= False):
         if Horizontal:
             img_grad = cv2.Sobel(img, cv2.CV_16S, 1, 0, ksize= ksize)
         else:
-            img_grad = cv2.Sobel(img, cv2.CV_16S, 0, 1, ksize= ksize)
-    
+            img_grad = cv2.Sobel(img, cv2.CV_16S, 0, 1, ksize= ksize)    
     neg_grad, pos_grad = Split_FloatToU8(img_grad)
 
     dbg_show = False
@@ -77,6 +78,31 @@ def Grad_NegPos(img, Horizontal=True, ksize=3, UseScharr= False):
         plt.subplot(1,3,3), plt.imshow(pos_grad, 'gray'), plt.title('PosU8-gradiant')
         plt.show()
     return neg_grad, pos_grad
+
+
+# https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_histograms/py_histogram_equalization/py_histogram_equalization.html
+def EqualizeIntensity(img, CLAHE=True):
+    img_hls = cv2.cvtColor(img,cv2.COLOR_BGR2HLS)
+    h,l,s = cv2.split(img_hls)
+    if (CLAHE):
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        leq = clahe.apply(l)
+    else:
+        leq = cv2.equalizeHist(l)
+    hls_eq = cv2.merge((h,leq,s))
+    img_eq = cv2.cvtColor(hls_eq,cv2.COLOR_HLS2BGR)
+
+    dbg_show = False
+    #dbg_show = True
+    if dbg_show:
+        plt.subplot(1,2,1), plt.hist(l.flatten(),256,[0,256], color = 'b')
+        plt.subplot(1,2,2), plt.hist(leq.flatten(),256,[0,256], color = 'r')
+        plt.show()
+        plt.subplot(1,2,1), plt.imshow(img)
+        plt.subplot(1,2,2), plt.imshow(img_eq)
+        plt.show()
+
+    return img_eq
 
 
 def Get_Corners(img):
@@ -126,49 +152,31 @@ if DoCorner:
     idx = 0
     for img_key in img_key_train:
         img =cv2.imread(image_dir + img_key)
-### Histogram Equalization
-# https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_histograms/py_histogram_equalization/py_histogram_equalization.html       
-        """
-        img_hls = cv2.cvtColor(img,cv2.COLOR_BGR2HLS)
-        h,l,s = cv2.split(img_hls)
-        leq = cv2.equalizeHist(l)
-        hls_eq = cv2.merge((h,leq,s))
-        img_eq = cv2.cvtColor(hls_eq,cv2.COLOR_HLS2BGR)
-
-        plt.subplot(1,2,1), plt.imshow(img)
-        plt.subplot(1,2,2), plt.imshow(img_eq)
-        plt.show()
-
-        plt.subplot(1,2,1), plt.hist(l.flatten(),256,[0,256], color = 'b')
-        plt.subplot(1,2,2), plt.hist(leq.flatten(),256,[0,256], color = 'r')
-        plt.show()
-        #hist,bins = np.histogram(img.flatten(),256,[0,256])
-        """
-        # CLAHE adaptive histogram equalization 
-        img_hls = cv2.cvtColor(img,cv2.COLOR_BGR2HLS)
-        h,l,s = cv2.split(img_hls)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-        leq = clahe.apply(l)
-        hls_eq = cv2.merge((h,leq,s))
-        img_eq = cv2.cvtColor(hls_eq, cv2.COLOR_HLS2BGR)
-
-        plt.subplot(1,2,1), plt.imshow(img)
-        plt.subplot(1,2,2), plt.imshow(img_eq)
-        plt.show()
-        img = img_eq
-        # CLAHE adaptive histogram equalization 
-### Note: Equalization does not fix glare from excessive lighting...
 
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
-        img_dxmin, img_dxmax = Grad_NegPos(gray, Horizontal=True, UseScharr= False)
-        img_dymin, img_dymax = Grad_NegPos(gray, Horizontal=False, UseScharr= False)
+        img_dxmin, img_dxmax = Sobel_SplitPosNeg(gray, Horizontal=True, UseScharr= False)
+        img_dymin, img_dymax = Sobel_SplitPosNeg(gray, Horizontal=False, UseScharr= False)
 
         edge_xmin = Get_Corners(img_dxmin)
         edge_xmax = Get_Corners(img_dxmax)
         edge_ymin = Get_Corners(img_dymin)
         edge_ymax = Get_Corners(img_dymax)
 
+        #### 2D Edge0-Feature Histogram #####
+        # https://docs.opencv.org/2.4/modules/imgproc/doc/histograms.html?highlight=calchist#calchist
+        # https://docs.opencv.org/3.3.1/dd/d0d/tutorial_py_2d_histogram.html
+Problem:  The images must have the same size
+        images = [img1,img2,img3]
+        channels = [0,2] # e.g. first & last
+        mask = None
+        bins = [20,16]
+        ranges [min1,max1, min2,max2]
+        hist = cv2.calcHist(images, channels, mask, histSize = bins, ranges)
+
+        # Use matplotlib.pyplot.imshow() function to plot 2D histogram with different color maps.
+        plt.imshow(hist, interpolation = 'nearest')
+        plt.show()
         """
         #https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_ml/py_kmeans/py_kmeans_opencv/py_kmeans_opencv.html
         # Next: Do K-Means Cluster analysis of the corner points 
