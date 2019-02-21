@@ -21,10 +21,10 @@ function Global:Invoke-CondaCmd
         $CondaExe = "$PSScriptRoot\conda.exe"
         if (!(Test-Path $CondaExe -ErrorAction Ignore))
         {
-            # If this file is not in the Scripts folder then check if caller defined _CONDA_ROOT
-            if ($env:_CONDA_ROOT)
+            # If this file is not in the Scripts folder then check if caller defined CONDA_PREFIX
+            if ($env:CONDA_PREFIX)
             {
-                $CondaExe = "$env:_CONDA_ROOT\Scripts\conda.exe"
+                $CondaExe = "$env:CONDA_PREFIX\Scripts\conda.exe"
             }
         }    
     }
@@ -104,24 +104,25 @@ function Global:Invoke-CondaCmd
             if ($CONDA_SHLVL -eq 0)
             {
                 # Restore the original prompt function
-                if ($function:Prompt_PS)
+                if ($Function:Prompt_PS -and ($Function:Prompt -eq $Function:Prompt_Conda))
                 {
-                    $function:Global:Prompt = $function:Prompt_PS
-                    Remove-Item -Path function:Global:Prompt_PS
-                    Remove-Item -Path function:Prompt_Conda -ErrorAction Ignore
+                    $Function:Prompt = $Function:Prompt_PS
                 }
+                # Cleanup the environment
+                Get-Item Env:Conda* | Set-Item -value $null -Force -ErrorAction Ignore
+                Remove-Item -Path Function:Prompt_* -ErrorAction Ignore
+                Remove-Item -Path Function:Invoke-Conda* -ErrorAction Ignore
+                Remove-Item -Path Alias:*conda* -Force -ErrorAction Ignore
+                Remove-Item -Path Alias:*activate -Force -ErrorAction Ignore
             }
             else
             {
-                if (!$function:Prompt_PS)
+                # Replace the original prompt function after backing it up
+                if ($Function:Prompt -ne $Function:Prompt_Conda)
                 {
-                    # Replace the original prompt function after backing it up
-                    if ($function:Prompt)
-                    {
-                        New-Item -Path "function:Global:Prompt_PS" -Value $function:Prompt | Out-Null
-                    }
-                    $function:Global:Prompt = $function:Prompt_Conda
+                    New-Item -Path Function:Prompt_PS -Value $Function:Prompt -Force | Out-Null
                 }
+                $Function:Prompt = $Function:Prompt_Conda
             }
         }            
     }
@@ -130,6 +131,7 @@ function Global:Invoke-CondaCmd
         Write-Host $_.Exception.Message -ForegroundColor Red
     }
 }
+Set-Alias -Name "conda" -Value Global:Invoke-CondaCmd -Scope Global
 
 
 <#
@@ -154,18 +156,15 @@ function Global:Prompt_Conda([String] $Prefix = $Env:CONDA_PROMPT_MODIFIER, $Col
     "$('>' * ($nestedPromptLevel + 1)) "    
 }
 
-
-Set-Alias -Name "conda" -Value Invoke-CondaCmd -Scope Global
-
 function Global:Invoke-CondaActivate
 {
-    Invoke-CondaCmd "activate", $args
+    Invoke-CondaCmd "activate", $Args
 }
 Set-Alias -Name "activate" -Value Global:Invoke-CondaActivate -Scope Global
 
 function Global:Invoke-CondaDeactivate
 {
-    Invoke-CondaCmd "deactivate", $args
+    Invoke-CondaCmd "deactivate", $Args
 }
 Set-Alias -Name "deactivate" -Value Global:Invoke-CondaDeactivate -Scope Global
 

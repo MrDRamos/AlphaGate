@@ -17,8 +17,9 @@ Miniconda3-latest-Windows-x86_64.exe
 (
 echo @ECHO off
 echo set CONDA_PREFIX=C:\Apps\MiniConda
-%CONDA_PREFIX%\Scripts\activate.bat %CONDA_PREFIX%
-) > AnaConda.bat
+echo %CONDA_PREFIX%\Scripts\activate.bat %CONDA_PREFIX%
+echo conda activate %1
+) > Conda-Init.bat
 
 #) Install Python 3.5.6 in a new Conda environment: tf
 #) NoteL There is a bug in windows version of matplotlib and python 3.5.6 that Conda is not aware of.

@@ -21,7 +21,8 @@ data_ofs = img_keys.index('IMG_0013.JPG')
 #data_ofs = img_keys.index('IMG_0013.JPG') 
 #data_ofs = img_keys.index('IMG_3565.JPG') # small
 #data_ofs = img_keys.index('IMG_4443.JPG') # + ladders
-data_ofs = img_keys.index('IMG_4746.JPG') # + ladders + glare + angle
+#data_ofs = img_keys.index('IMG_4746.JPG')  # + ladders + glare + angle
+#data_ofs = img_keys.index('IMG_9180.JPG') # + ladders + glare + angle
 
 train_qty = 6
 Validate_qty = 2
@@ -143,7 +144,7 @@ if DoCorner:
         plt.show()
         #hist,bins = np.histogram(img.flatten(),256,[0,256])
         """
-        # CLAHE adaptive histogram equalization         
+        # CLAHE adaptive histogram equalization 
         img_hls = cv2.cvtColor(img,cv2.COLOR_BGR2HLS)
         h,l,s = cv2.split(img_hls)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
@@ -155,7 +156,9 @@ if DoCorner:
         plt.subplot(1,2,2), plt.imshow(img_eq)
         plt.show()
         img = img_eq
-###
+        # CLAHE adaptive histogram equalization 
+### Note: Equalization does not fix glare from excessive lighting...
+
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
         img_dxmin, img_dxmax = Grad_NegPos(gray, Horizontal=True, UseScharr= False)
