@@ -107,7 +107,7 @@ def EqualizeIntensity(img, CLAHE=True):
 
 def Get_Corners(img):
     # https://docs.opencv.org/2.4/modules/imgproc/doc/feature_detection.html?highlight=goodfeaturestotrack#cv2.goodFeaturesToTrack
-    maxCorners  = 128
+    maxCorners  = 300 #128  at lead 40/corner + Top/Btm AIRR Lables + some outliers which we will have to filter
     qualityLevel = 0.1 # Parameter characterizing the minimal accepted quality of image corners
     minDistance = 1    # Minimum possible Euclidean distance between the returned corners
     blockSize = 3      # Default =3, Size of an average block for computing a derivative covariation matrix over each pixel neighborhood
@@ -116,7 +116,11 @@ def Get_Corners(img):
     dbg_show = False
     dbg_show = True
     if dbg_show:
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        img_abs = np.absolute(img)
+        _, img_max, _, _ = cv2.minMaxLoc(img_abs)
+        pos_U8 = ConvertFloat_ToU8(img_abs, img_max)
+        img_rgb = cv2.cvtColor(pos_U8, cv2.COLOR_GRAY2RGB)
+        #img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
 #######
         colorS = ((255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,0,255),(0,255,255),(255,255,255),
                   (195,30,30),(30,195,30),(30,30,255),(195,195,120),(195,120,195),(120,195,195),(195,195,195))
@@ -151,9 +155,48 @@ DoCorner = True
 if DoCorner:
     idx = 0
     for img_key in img_key_train:
-        img =cv2.imread(image_dir + img_key)
+        img = cv2.imread(image_dir + img_key)
+        
+        gray = None
+        if False:  # dbg_img_colors
+            b, g, r = cv2.split(img)
+            plt.subplot(1, 3, 1), plt.imshow(b, 'Blues')
+            plt.subplot(1, 3, 2), plt.imshow(g, 'Greens')
+            plt.subplot(1, 3, 3), plt.imshow(r, 'Reds')
+            plt.show()
+            if False: # Remove blue(Main Gate coler) -> Increases intensity changes
+                b = b * 0
+            img_coler_filtered = cv2.merge((b, g, r))
+            gray = cv2.cvtColor(img_coler_filtered, cv2.COLOR_BGR2GRAY)
+            plt.subplot(1, 2, 1), plt.imshow(img_coler_filtered)
+            plt.subplot(1, 2, 2), plt.imshow(gray)
+            plt.show()
+        if (gray is None):
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            
+        # View clipping results
+        if False:
+            gray_max = 255 - 20
+            gray_fact = 255 / gray_max
+            #gray_new = np.where((gray * gray_fact) > 255, 255, (gray * gray_fact)).astype(np.uint8)
+            gray_new = np.where((gray * gray_fact) > 255, 255,  np.uint8(gray * gray_fact))
+            plt.subplot(1, 2, 1), plt.imshow(gray)
+            plt.subplot(1, 2, 2), plt.imshow(gray_new)
+            plt.show()
 
-        gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+        ############## Keep, This realy helps !! ############
+        # Clipp highest intensities(Light bulbs & fixtures) to improve gradiants at lower intensities
+        if True:
+            gray_max = 255 - 20
+            gray_fact = 255 / gray_max
+            gray = np.where((gray * gray_fact) > 255, 255, np.uint8(gray * gray_fact))
+
+        if False:  # sobel without splitting - Result: Dont get as many edges as with splitting
+            img_dx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, 5)
+            img_dy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, 5)
+            edge_xmin = Get_Corners(img_dx)
+            edge_xmax = Get_Corners(img_dy)
+        ##########
 
         img_dxmin, img_dxmax = Sobel_SplitPosNeg(gray, Horizontal=True, UseScharr= False)
         img_dymin, img_dymax = Sobel_SplitPosNeg(gray, Horizontal=False, UseScharr= False)
@@ -163,9 +206,11 @@ if DoCorner:
         edge_ymin = Get_Corners(img_dymin)
         edge_ymax = Get_Corners(img_dymax)
 
+
         #### 2D Edge0-Feature Histogram #####
         # https://docs.opencv.org/2.4/modules/imgproc/doc/histograms.html?highlight=calchist#calchist
         # https://docs.opencv.org/3.3.1/dd/d0d/tutorial_py_2d_histogram.html
+        """
 Problem:  The images must have the same size
         images = [img1,img2,img3]
         channels = [0,2] # e.g. first & last
@@ -177,6 +222,8 @@ Problem:  The images must have the same size
         # Use matplotlib.pyplot.imshow() function to plot 2D histogram with different color maps.
         plt.imshow(hist, interpolation = 'nearest')
         plt.show()
+"""
+
         """
         #https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_ml/py_kmeans/py_kmeans_opencv/py_kmeans_opencv.html
         # Next: Do K-Means Cluster analysis of the corner points 
