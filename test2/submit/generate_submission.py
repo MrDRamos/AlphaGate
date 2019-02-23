@@ -17,254 +17,18 @@ img_file = glob.glob(image_dir + '*.JPG')
 img_keys = [img_i.split(os.sep)[-1] for img_i in img_file]
 
 data_ofs = 0
-data_ofs = img_keys.index('IMG_0013.JPG') 
-#data_ofs = img_keys.index('IMG_0013.JPG') 
-#data_ofs = img_keys.index('IMG_3565.JPG') # small
+data_ofs = img_keys.index('IMG_0013.JPG')  # large + litle glare
+#data_ofs = img_keys.index('IMG_3565.JPG') # small 
 #data_ofs = img_keys.index('IMG_4443.JPG') # + ladders
-#data_ofs = img_keys.index('IMG_4746.JPG')  # + ladders + glare + angle
+#data_ofs = img_keys.index('IMG_4746.JPG') # + ladders + glare + angle
 #data_ofs = img_keys.index('IMG_9180.JPG') # + ladders + glare + angle
+#data_ofs = img_keys.index('IMG_0638.JPG') # large + angle
+#data_ofs = img_keys.index('IMG_0711.JPG') # smale + angle
 
-train_qty = 6
+train_qty = 10
 Validate_qty = 2
 img_key_train = img_keys[data_ofs : data_ofs + train_qty]
 img_key_validate = img_keys[data_ofs + train_qty : data_ofs + train_qty + Validate_qty]
-
-####################
-from matplotlib import pyplot as plt
-import math
-
-def ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues = False):
-    scalefactor = 255.9999/MaxFloat
-    tmp = np.copy(SrcArray) * scalefactor
-    if NegValues:
-        tmp[0 < tmp] = 0 # Only include negative values
-        u8Array = np.uint8(-tmp)
-    else:
-        tmp[tmp < 0] = 0 # Only include positive values
-        u8Array = np.uint8(tmp)
-    return u8Array
-
-
-def Split_FloatToU8(SrcArray):
-    fstat = cv2.minMaxLoc(SrcArray)
-    MaxFloat = max(fstat[1], -fstat[0])    
-    neg_U8 = ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues= True)
-    pos_U8 = ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues= False)
-    return neg_U8,pos_U8 
-
-
-def Sobel_SplitPosNeg(img, Horizontal=True, ksize=3, UseScharr= False):
-    # https://docs.opencv.org/2.4/modules/imgproc/doc/filtering.html?highlight=sobel#cv2.Sobel
-    if UseScharr:
-        if Horizontal:
-            img_grad = cv2.Scharr(img, cv2.CV_16S, 1, 0)
-        else:
-            img_grad = cv2.Scharr(img, cv2.CV_16S, 0, 1)
-    else:
-        if Horizontal:
-            img_grad = cv2.Sobel(img, cv2.CV_16S, 1, 0, ksize= ksize)
-        else:
-            img_grad = cv2.Sobel(img, cv2.CV_16S, 0, 1, ksize= ksize)    
-    neg_grad, pos_grad = Split_FloatToU8(img_grad)
-
-    dbg_show = False
-    #dbg_show = True
-    if dbg_show:
-        fstat = cv2.minMaxLoc(img_grad); print(fstat)
-        nstat = cv2.minMaxLoc(neg_grad); print(nstat)
-        pstat = cv2.minMaxLoc(pos_grad); print(pstat)
-        plt.subplot(1,3,1), plt.imshow(img_grad, 'gray'), plt.title('Float-gradiant')
-        plt.subplot(1,3,2), plt.imshow(neg_grad, 'gray'), plt.title('NegU8-gradiant')
-        plt.subplot(1,3,3), plt.imshow(pos_grad, 'gray'), plt.title('PosU8-gradiant')
-        plt.show()
-    return neg_grad, pos_grad
-
-
-# https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_histograms/py_histogram_equalization/py_histogram_equalization.html
-def EqualizeIntensity(img, CLAHE=True):
-    img_hls = cv2.cvtColor(img,cv2.COLOR_BGR2HLS)
-    h,l,s = cv2.split(img_hls)
-    if (CLAHE):
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-        leq = clahe.apply(l)
-    else:
-        leq = cv2.equalizeHist(l)
-    hls_eq = cv2.merge((h,leq,s))
-    img_eq = cv2.cvtColor(hls_eq,cv2.COLOR_HLS2BGR)
-
-    dbg_show = False
-    #dbg_show = True
-    if dbg_show:
-        plt.subplot(1,2,1), plt.hist(l.flatten(),256,[0,256], color = 'b')
-        plt.subplot(1,2,2), plt.hist(leq.flatten(),256,[0,256], color = 'r')
-        plt.show()
-        plt.subplot(1,2,1), plt.imshow(img)
-        plt.subplot(1,2,2), plt.imshow(img_eq)
-        plt.show()
-
-    return img_eq
-
-
-def Get_Corners(img):
-    # https://docs.opencv.org/2.4/modules/imgproc/doc/feature_detection.html?highlight=goodfeaturestotrack#cv2.goodFeaturesToTrack
-    maxCorners  = 300 #128  at lead 40/corner + Top/Btm AIRR Lables + some outliers which we will have to filter
-    qualityLevel = 0.1 # Parameter characterizing the minimal accepted quality of image corners
-    minDistance = 1    # Minimum possible Euclidean distance between the returned corners
-    blockSize = 3      # Default =3, Size of an average block for computing a derivative covariation matrix over each pixel neighborhood
-    CornerS = cv2.goodFeaturesToTrack(img, maxCorners, qualityLevel, minDistance, blockSize = blockSize)
-
-    dbg_show = False
-    dbg_show = True
-    if dbg_show:
-        img_abs = np.absolute(img)
-        _, img_max, _, _ = cv2.minMaxLoc(img_abs)
-        pos_U8 = ConvertFloat_ToU8(img_abs, img_max)
-        img_rgb = cv2.cvtColor(pos_U8, cv2.COLOR_GRAY2RGB)
-        #img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-#######
-        colorS = ((255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,0,255),(0,255,255),(255,255,255),
-                  (195,30,30),(30,195,30),(30,30,255),(195,195,120),(195,120,195),(120,195,195),(195,195,195))
-        #colorS = [list(np.random.choice(range(256), size= 3)) for i in range(5)]
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 5.0)
-        K = 10
-        ret,labelS,centerS = cv2.kmeans(CornerS, K, None, criteria, 16, cv2.KMEANS_PP_CENTERS)
-        rad = int(math.sqrt(ret/maxCorners))
-        for i, center in enumerate(centerS):
-            color = colorS[i]
-            x,y = center.astype(int).ravel()
-            cv2.circle(img_rgb, (x,y), rad, color, 2)
-            PointS = CornerS[labelS==i]
-            for Point in PointS:
-                x,y = Point.ravel()
-                cv2.circle(img_rgb, (x,y), 1, color, -1)
-#######
-        """
-        color = [255,0,0] 
-        for Corner in CornerS:
-            x,y = Corner.ravel()
-            cv2.circle(img_rgb, (x,y), 1, color, -1)
-        """            
-        plt.imshow(img_rgb), plt.show()
-    return CornerS
-
-
-
-# Corner detection
-#https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_feature2d/py_features_harris/py_features_harris.html#harris-corners
-DoCorner = True
-if DoCorner:
-    idx = 0
-    for img_key in img_key_train:
-        img = cv2.imread(image_dir + img_key)
-        
-        gray = None
-        if False:  # dbg_img_colors
-            b, g, r = cv2.split(img)
-            plt.subplot(1, 3, 1), plt.imshow(b, 'Blues')
-            plt.subplot(1, 3, 2), plt.imshow(g, 'Greens')
-            plt.subplot(1, 3, 3), plt.imshow(r, 'Reds')
-            plt.show()
-            if False: # Remove blue(Main Gate coler) -> Increases intensity changes
-                b = b * 0
-            img_coler_filtered = cv2.merge((b, g, r))
-            gray = cv2.cvtColor(img_coler_filtered, cv2.COLOR_BGR2GRAY)
-            plt.subplot(1, 2, 1), plt.imshow(img_coler_filtered)
-            plt.subplot(1, 2, 2), plt.imshow(gray)
-            plt.show()
-        if (gray is None):
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            
-        # View clipping results
-        if False:
-            gray_max = 255 - 20
-            gray_fact = 255 / gray_max
-            #gray_new = np.where((gray * gray_fact) > 255, 255, (gray * gray_fact)).astype(np.uint8)
-            gray_new = np.where((gray * gray_fact) > 255, 255,  np.uint8(gray * gray_fact))
-            plt.subplot(1, 2, 1), plt.imshow(gray)
-            plt.subplot(1, 2, 2), plt.imshow(gray_new)
-            plt.show()
-
-        ############## Keep, This realy helps !! ############
-        # Clipp highest intensities(Light bulbs & fixtures) to improve gradiants at lower intensities
-        if True:
-            gray_max = 255 - 20
-            gray_fact = 255 / gray_max
-            gray = np.where((gray * gray_fact) > 255, 255, np.uint8(gray * gray_fact))
-
-        if False:  # sobel without splitting - Result: Dont get as many edges as with splitting
-            img_dx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, 5)
-            img_dy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, 5)
-            edge_xmin = Get_Corners(img_dx)
-            edge_xmax = Get_Corners(img_dy)
-        ##########
-
-        img_dxmin, img_dxmax = Sobel_SplitPosNeg(gray, Horizontal=True, UseScharr= False)
-        img_dymin, img_dymax = Sobel_SplitPosNeg(gray, Horizontal=False, UseScharr= False)
-
-        edge_xmin = Get_Corners(img_dxmin)
-        edge_xmax = Get_Corners(img_dxmax)
-        edge_ymin = Get_Corners(img_dymin)
-        edge_ymax = Get_Corners(img_dymax)
-
-
-        #### 2D Edge0-Feature Histogram #####
-        # https://docs.opencv.org/2.4/modules/imgproc/doc/histograms.html?highlight=calchist#calchist
-        # https://docs.opencv.org/3.3.1/dd/d0d/tutorial_py_2d_histogram.html
-        """
-Problem:  The images must have the same size
-        images = [img1,img2,img3]
-        channels = [0,2] # e.g. first & last
-        mask = None
-        bins = [20,16]
-        ranges [min1,max1, min2,max2]
-        hist = cv2.calcHist(images, channels, mask, histSize = bins, ranges)
-
-        # Use matplotlib.pyplot.imshow() function to plot 2D histogram with different color maps.
-        plt.imshow(hist, interpolation = 'nearest')
-        plt.show()
-"""
-
-        """
-        #https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_ml/py_kmeans/py_kmeans_opencv/py_kmeans_opencv.html
-        # Next: Do K-Means Cluster analysis of the corner points 
-        # Divide them into k=4 Gate-corners
-        # define criteria, number of clusters(K) and apply kmeans()
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 1.0)
-        K = 10
-        ret,label,center=cv2.kmeans(fcorners, K, None, criteria, 20, cv2.KMEANS_PP_CENTERS)
-        # Now separate the data, Note the flatten()
-        corners = np.int0(fcorners)
-        Group = []
-        Group.append( fcorners[label.ravel()==0] )
-        Group.append( fcorners[label.ravel()==1] )
-        Group.append( fcorners[label.ravel()==2] )
-        Group.append( fcorners[label.ravel()==3] )
-        Group.append( fcorners[label.ravel()==4] )
-        Group.append( fcorners[label.ravel()==5] )
-        Group.append( fcorners[label.ravel()==6] )
-        Group.append( fcorners[label.ravel()==7] )
-        Group.append( fcorners[label.ravel()==8] )
-        Group.append( fcorners[label.ravel()==9] )
-
-        cn = [[0,0,255], [0,255,0], [255,0,0]]
-        ci = 0
-        for g in Group:            
-            color = cn [ci % 3]
-            for i in g:
-                x,y = i.ravel()
-                cv2.circle(img, (x,y), 3, color, -1)
-            ci += 1
-
-
-        #plt.subplot(2,3,idx+1), 
-        plt.imshow(img)
-        plt.title(img_key)
-        plt.xticks([]),plt.yticks([])
-        plt.show()
-        idx += 1
-        """
-os._exit(0)
-####################
 
 
 # Instantiate a new detector
@@ -285,7 +49,7 @@ mean_time = np.mean(time_all)
 ci_time = 1.96*np.std(time_all)
 freq = np.round(1/mean_time,2)
     
-print('95% confidence interval for inference time is {0:.2f} +/- {1:.4f}.'.format(mean_time,ci_time))
+print('95% confidence interval for inference time is {0:.3f}ms +/- {1:.3f}.'.format(mean_time,ci_time))
 print('Operating frequency from loading image to getting results is {0:.2f}.'.format(freq))
 
 with open('random_submission.json', 'w') as f:
