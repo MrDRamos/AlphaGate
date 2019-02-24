@@ -16,20 +16,24 @@ image_dir = '../../AlphaPilot/Data_Training/'
 img_file = glob.glob(image_dir + '*.JPG')
 img_keys = [img_i.split(os.sep)[-1] for img_i in img_file]
 
-data_ofs = 0
-data_ofs = img_keys.index('IMG_0013.JPG')  # large + litle glare
-#data_ofs = img_keys.index('IMG_3565.JPG') # small 
-#data_ofs = img_keys.index('IMG_4443.JPG') # + ladders
-#data_ofs = img_keys.index('IMG_4746.JPG') # + ladders + glare + angle
-#data_ofs = img_keys.index('IMG_9180.JPG') # + ladders + glare + angle
-#data_ofs = img_keys.index('IMG_0638.JPG') # large + angle
-#data_ofs = img_keys.index('IMG_0711.JPG') # smale + angle
+train = False
+train = True
+if train:
+    data_ofs = 0
+    data_ofs = img_keys.index('IMG_0013.JPG')  # large + litle glare
+    #data_ofs = img_keys.index('IMG_3565.JPG') # small 
+    #data_ofs = img_keys.index('IMG_4443.JPG') # + ladders
+    #data_ofs = img_keys.index('IMG_4746.JPG') # + ladders + glare + angle left
+    #data_ofs = img_keys.index('IMG_9180.JPG') # + ladders + glare + angle
+    #data_ofs = img_keys.index('IMG_0638.JPG') # large + angle
+    #data_ofs = img_keys.index('IMG_0711.JPG') # smale + angle
 
-train_qty = 10
-Validate_qty = 2
-img_key_train = img_keys[data_ofs : data_ofs + train_qty]
-img_key_validate = img_keys[data_ofs + train_qty : data_ofs + train_qty + Validate_qty]
-
+    train_qty = 20
+    Validate_qty = 2
+    img_key_train = img_keys[data_ofs : data_ofs + train_qty]
+    img_key_validate = img_keys[data_ofs + train_qty : data_ofs + train_qty + Validate_qty]
+else:
+    img_key_train = img_keys
 
 # Instantiate a new detector
 finalDetector = GenerateFinalDetections()

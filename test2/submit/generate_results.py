@@ -184,7 +184,21 @@ def show_edges(gray, edge_x, edge_y, clusters = 10):
     plt.show()
 
 
-def get_edges(gray):
+#### 2D Edge0-Feature Histogram #####
+# https://docs.opencv.org/2.4/modules/imgproc/doc/histograms.html?highlight=calchist#calchist
+# https://docs.opencv.org/3.3.1/dd/d0d/tutorial_py_2d_histogram.html
+def edge_hist(edges, img, bin_dx, bin_dy = None):
+    if bin_dy == None:
+        bin_dy = bin_dx    
+    bin_x, bin_y = img.shape[1] // bin_dx, img.shape[0] // bin_dy
+    rng_x, rng_y = [0, img.shape[1]],    [0, img.shape[0]]
+    ex, ey       = edges[:,:,0].ravel(), edges[:,:,1].ravel()
+    hist, xbins, ybins = np.histogram2d(ex, ey, [bin_x, bin_y], [rng_x, rng_y])
+    #hist = cv2.calcHist([edge_x], [0,1], None, histSize = bins, ranges= ranges)
+    return hist, xbins, ybins
+
+
+def get_edges(gray, img_name= None):
     # Extract edge features
     maxCorners  = 250 #128  at lead 40/corner + Top/Btm AIRR Lables + some outliers which we will have to filter
     ksize = 3   # kernal size
@@ -210,7 +224,83 @@ def get_edges(gray):
         edge_y = get_corners_xy(img_dy, maxCorners)
     #show_edges(gray, edge_x, edge_y)
     #show_edges(gray, edge_x, edge_y, clusters=10)
+
+
+    #### 2D Edge0-Feature Histogram #####
+    pixelsPerBin = 20 #15 # 100 # 15 for small gate
+    hist_x, xbins_x, ybins_x = edge_hist(edge_x, gray, pixelsPerBin)
+    hist_y, xbins_y, ybins_y = edge_hist(edge_y, gray, pixelsPerBin)
+    if False:
+#    if True:
+        plt.subplot(1,3,1), plt.imshow(hist_x, interpolation = 'nearest'), plt.title("X-Hist ")
+        plt.subplot(1,3,2), plt.imshow(hist_y, interpolation = 'nearest'), plt.title("Y-Hist ")
+        plt.subplot(1,3,3), plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
     
+    ### Line detection ####
+    #lines = cv2.HoughLines(hist_x, 1, np.pi/180, 200) 
+    hst = np.uint8(hist_x)
+    lines = cv2.HoughLinesP(hst, 1, np.pi/180*5, 8, minLineLength=8, maxLineGap=6)
+    if True:
+        if not (lines is None):
+            print(len(lines))
+            hist_l = np.zeros_like(hst)
+            for x1,y1,x2,y2 in lines[:,0]:
+                cv2.line(hist_l,(x1,y1),(x2,y2),(255,255,255),1)
+            plt.subplot(1,2,1), plt.imshow(hist_l, interpolation = 'nearest'), plt.title("X-Lines ")
+            plt.subplot(1,2,2), plt.imshow(hist_y, interpolation = 'nearest'), plt.title("X-Hist ")
+            plt.show()
+
+    if False:
+        ### Blob detection
+        # https://www.learnopencv.com/blob-detection-using-opencv-python-c/    
+        # Set up the detector with default parameters.
+        hst = scale_intensity(hist_x, 5)
+        hst = np.uint8(hst)
+        params = cv2.SimpleBlobDetector_Params()    
+        """ #default params
+        params.blobColor: 0
+        params.filterByArea: True
+        params.filterByCircularity: False
+        params.filterByColor: True
+        params.filterByConvexity: True
+        params.filterByInertia: True
+        params.maxArea: 5000.0
+        params.maxCircularity: 3.4028234663852886e+38
+        params.maxConvexity: 3.4028234663852886e+38
+        params.maxInertiaRatio: 3.4028234663852886e+38
+        params.maxThreshold: 220.0
+        params.minArea: 25.0
+        params.minCircularity: 0.800000011920929
+        params.minConvexity: 0.949999988079071
+        params.minDistBetweenBlobs: 10.0
+        params.minInertiaRatio: 0.10000000149011612
+        params.minRepeatability: 2
+        params.minThreshold: 50.0
+        params.thresholdStep: 10.0
+        """
+        params.filterByArea = True
+        params.filterByCircularity = False
+        params.filterByColor = False
+        params.filterByConvexity = False
+        params.filterByInertia = False
+        params.minArea = 2
+        params.minConvexity = 0
+
+        params.minThreshold = 2
+        params.maxThreshold = 200
+        params.thresholdStep = 10
+
+        detector = cv2.SimpleBlobDetector_create()
+        keypoints = detector.detect(hst)
+        keyCount = len(keypoints)
+        if 0 < keyCount:        
+            # Draw detected blobs as red circles.
+            # cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS ensures the size of the circle corresponds to the size of blob
+            im_with_keypoints = cv2.drawKeypoints(hst, keypoints, np.array([]), (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)   
+            cv2.imshow("Keypoints", im_with_keypoints)
+            cv2.waitKey(0)
+
+
     # Center of mass
     cxx,cxy = np.average(edge_x[:,:,0]), np.average(edge_x[:,:,1])
     cyx,cyy = np.average(edge_y[:,:,0]), np.average(edge_y[:,:,1])
@@ -218,6 +308,7 @@ def get_edges(gray):
     cx, cy = int((cxx+ cyx) * edge_x.shape[0]/n) , int((cxy +cyy) * edge_y.shape[0]/n)
 
     # mean radius of all edges
+    # cv2.minAreaRec() <-- try this
     rxx,rxy = np.average(np.abs(edge_x[:,:,0] -cx)), np.average(np.abs(edge_x[:,:,1] -cy))
     ryx,ryy = np.average(np.abs(edge_y[:,:,0] -cx)), np.average(np.abs(edge_y[:,:,1] -cy))
     rx, ry = int((rxx + ryx)/2), int((rxy + ryy)/2)
@@ -230,7 +321,7 @@ def get_edges(gray):
     return  (x1,y1), (x2,y2), (x3,y3), (x4,y4)
 
 
-def my_prediction(img):
+def my_prediction(img, img_name= None):
     gray = None
     if False:  # See if removing blue channel improves hamdling glarae: No
         b, g, r = cv2.split(img)
@@ -263,31 +354,14 @@ def my_prediction(img):
     if True:
         gray = scale_intensity(gray, 255 / (255 - 20))
 
-    (x1,y1), (x2,y2), (x3,y3), (x4,y4) = get_edges(gray)
+    (x1,y1), (x2,y2), (x3,y3), (x4,y4) = get_edges(gray, img_name)
     dbg_show = True
-    #dbg_show = False
+    dbg_show = False
     if dbg_show:
         plt.imshow(img)
         plt.plot([x1,x2,x3,x4,x1],  [y1,y2,y3,y4,y1], color='r', linewidth=3)
         plt.show()
     return  (x1,y1), (x2,y2), (x3,y3), (x4,y4)
-
-    #### 2D Edge0-Feature Histogram #####
-    # https://docs.opencv.org/2.4/modules/imgproc/doc/histograms.html?highlight=calchist#calchist
-    # https://docs.opencv.org/3.3.1/dd/d0d/tutorial_py_2d_histogram.html
-    """
-Problem:  The images must have the same size
-    images = [img1,img2,img3]
-    channels = [0,2] # e.g. first & last
-    mask = None
-    bins = [20,16]
-    ranges [min1,max1, min2,max2]
-    hist = cv2.calcHist(images, channels, mask, histSize = bins, ranges)
-
-    # Use matplotlib.pyplot.imshow() function to plot 2D histogram with different color maps.
-    plt.imshow(hist, interpolation = 'nearest')
-    plt.show()
-"""
 
 
 class GenerateFinalDetections():
@@ -296,8 +370,8 @@ class GenerateFinalDetections():
         self.Foo_Enable = True
         self.seed = 2018
         
-    def predict(self,img,img_name="na"):
-        (x1,y1), (x2,y2), (x3,y3), (x4,y4) = my_prediction(img)
+    def predict(self, img, img_name ="na"):
+        (x1,y1), (x2,y2), (x3,y3), (x4,y4) = my_prediction(img, img_name)
         bb_all = np.array([x1,y1,x2,y2,x3,y3,x4,y4,0.5])
         """
         np.random.seed(self.seed)
