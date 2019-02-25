@@ -8,43 +8,58 @@ import numpy as np
 # Implement a function that takes an image as an input, performs any preprocessing steps and outputs a list of bounding box detections and assosciated confidence score. 
 from matplotlib import pyplot as plt
 import math
+import time
+
 
 def ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues = False):
-    scalefactor = 255.9999/MaxFloat
-    tmp = np.copy(SrcArray) * scalefactor
-    if NegValues:
-        tmp[0 < tmp] = 0 # Only include negative values
-        u8Array = np.uint8(-tmp)
-    else:
-        tmp[tmp < 0] = 0 # Only include positive values
-        u8Array = np.uint8(tmp)
+    tmp = cv2.scaleAdd(SrcArray, 255.4999/MaxFloat -1, SrcArray)
+    if NegValues:   # Only include negative values
+        tmp.clip(max=0, out=tmp)
+        u8Array = np.uint8(np.abs(tmp, out= tmp))
+    else:           # Only include positive values
+        u8Array = np.uint8(tmp.clip(min=0))
     return u8Array
 
+# split the imput into pos / neg values (same shape). Return (inplace Neg),(new Pos) arrays
+def SplitAbs_NegPos(SrcArray):
+    pos = SrcArray.clip(min=0)
+    SrcArray.clip(max=0, out=SrcArray)
+    np.abs(SrcArray, out=SrcArray)
+    return SrcArray, pos
 
-def Split_FloatToU8(SrcArray):
+def SplitFloat_NegPosU8(SrcArray):
     fstat = cv2.minMaxLoc(SrcArray)
-    MaxFloat = max(fstat[1], -fstat[0])    
-    neg_U8 = ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues= True)
-    pos_U8 = ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues= False)
-    return neg_U8,pos_U8 
+    MaxFloat = max(fstat[1], -fstat[0]) 
+
+    tmp = cv2.scaleAdd(SrcArray, 255.4999/MaxFloat -1, SrcArray)
+    pos_U8 = np.uint8(tmp.clip(min=0))
+
+    tmp.clip(max=0, out=tmp)
+    neg_U8 = np.uint8(np.abs(tmp, out= tmp))
+    return neg_U8, pos_U8 
 
 
 def Sobel_SplitPosNeg(img, Horizontal=True, ksize=3, UseScharr= False):
+    dtype = cv2.CV_16S
+    #dtype = cv2.CV_32F
     # https://docs.opencv.org/2.4/modules/imgproc/doc/filtering.html?highlight=sobel#cv2.Sobel
     if UseScharr:
         if Horizontal:
-            img_grad = cv2.Scharr(img, cv2.CV_16S, 1, 0)
+            img_grad = cv2.Scharr(img, dtype, 1, 0)
         else:
-            img_grad = cv2.Scharr(img, cv2.CV_16S, 0, 1)
+            img_grad = cv2.Scharr(img, dtype, 0, 1)
     else:
         if Horizontal:
-            img_grad = cv2.Sobel(img, cv2.CV_16S, 1, 0, ksize= ksize)
+            img_grad = cv2.Sobel(img, dtype, 1, 0, ksize= ksize)
         else:
-            img_grad = cv2.Sobel(img, cv2.CV_16S, 0, 1, ksize= ksize)    
-    neg_grad, pos_grad = Split_FloatToU8(img_grad)
+            img_grad = cv2.Sobel(img, dtype, 0, 1, ksize= ksize)
+    if (dtype == cv2.CV_16S):
+        neg_grad, pos_grad = SplitFloat_NegPosU8(img_grad)
+    else:
+        neg_grad, pos_grad = SplitAbs_NegPos(img_grad)
 
     dbg_show = False
-    #dbg_show = True
+#    dbg_show = True
     if dbg_show:
         fstat = cv2.minMaxLoc(img_grad); print(fstat)
         nstat = cv2.minMaxLoc(neg_grad); print(nstat)
@@ -69,7 +84,7 @@ def EqualizeIntensity(img, CLAHE=True):
     img_eq = cv2.cvtColor(hls_eq,cv2.COLOR_HLS2BGR)
 
     dbg_show = False
-    #dbg_show = True
+    dbg_show = True
     if dbg_show:
         plt.subplot(1,2,1), plt.hist(l.flatten(),256,[0,256], color = 'b')
         plt.subplot(1,2,2), plt.hist(leq.flatten(),256,[0,256], color = 'r')
@@ -89,7 +104,7 @@ def get_corners_xy(img, maxCorners=128):
     CornerS = cv2.goodFeaturesToTrack(img, maxCorners, qualityLevel, minDistance, blockSize = blockSize)
 
     dbg_show = False
-    #dbg_show = True
+#    dbg_show = True
     if dbg_show:
         img_abs = convert2absU8(img)
         img_rgb = cv2.cvtColor(img_abs, cv2.COLOR_GRAY2RGB)
@@ -116,6 +131,14 @@ def convert2absU8(img):
     img_U8 = ConvertFloat_ToU8(img_abs, img_max)
     return img_U8
 
+
+# truncates values above 255
+def scale_intensity(grayU8, factor, dst=None):
+    gray = cv2.scaleAdd(grayU8, factor-1, grayU8, dst=dst)
+    #gray = np.where((grayU8 * factor) > 255, 255, np.uint8(grayU8 * factor)) #Same but 10x slower!! 
+    return gray
+
+
 # https://www.learnopencv.com/color-spaces-in-opencv-cpp-python/
 # returns a list of rbc colors that can be used as cv2 color arguments
 def get_colors(count, stepsize=None):
@@ -128,11 +151,6 @@ def get_colors(count, stepsize=None):
     rgb_colors = img_rgb[0].tolist() # unwrap the image array into a list of (r,g,b) values
     return rgb_colors
 
-# truncates values above 255
-def scale_intensity(grayU8, factor):
-    gray = cv2.scaleAdd(grayU8, factor-1, grayU8)
-    #gray = np.where((grayU8 * factor) > 255, 255, np.uint8(grayU8 * factor)) #Same but 10x slower!! 
-    return gray
 
 def show_edge_custers(img, edge_p, clusters):
     colorS = get_colors(clusters)
@@ -177,8 +195,8 @@ def show_edges(gray, edge_x, edge_y, clusters = 10):
         for p in edge_y:
             x,y = p.ravel()
             cv2.circle(img_y, (x,y), 1, colorS[1], -1) 
-    lbl_x = "x-sobel %d" % edge_x.shape[0]
-    lbl_y = "y-sobel %d" % edge_y.shape[0]
+    lbl_x = "show_edges: x-sobel %d" % edge_x.shape[0]
+    lbl_y = "show_edges: y-sobel %d" % edge_y.shape[0]
     plt.subplot(1,2,1), plt.imshow(img_x), plt.title(lbl_x)
     plt.subplot(1,2,2), plt.imshow(img_y), plt.title(lbl_y)
     plt.show()
@@ -193,7 +211,9 @@ def edge_hist(edges, img, bin_dx, bin_dy = None):
     bin_x, bin_y = img.shape[1] // bin_dx, img.shape[0] // bin_dy
     rng_x, rng_y = [0, img.shape[1]],    [0, img.shape[0]]
     ex, ey       = edges[:,:,0].ravel(), edges[:,:,1].ravel()
-    hist, xbins, ybins = np.histogram2d(ex, ey, [bin_x, bin_y], [rng_x, rng_y])
+    # Note: we revers x,y so that the numpy result has shape propotions as the input image
+    hist, xbins, ybins = np.histogram2d(ey, ex, [bin_y, bin_x], [rng_y, rng_x])
+#    hist, xbins, ybins = np.histogram2d(ex, ey, [bin_x, bin_y], [rng_x, rng_y])
     #hist = cv2.calcHist([edge_x], [0,1], None, histSize = bins, ranges= ranges)
     return hist, xbins, ybins
 
@@ -202,12 +222,14 @@ def get_edges(gray, img_name= None):
     # Extract edge features
     maxCorners  = 250 #128  at lead 40/corner + Top/Btm AIRR Lables + some outliers which we will have to filter
     ksize = 3   # kernal size
-    Use_PosNeg_Gradiant_Splitting = True # Tradeoff feature quantity vs speed
+    Use_PosNeg_Gradiant_Splitting = False # Tradeoff feature quantity vs speed - 100 ms
+    Use_PosNeg_Gradiant_Splitting = True  # Tradeoff feature quantity vs speed  - 300 ms
     if Use_PosNeg_Gradiant_Splitting:
-        # Split the sobel results into Pos,|Neg| features -> Yields More information -> more edges
+        # Split the sobel results into Pos,|Neg| features -> Yields More information -> more edges (28 ms- 14 ms/call)
         img_dxNeg, img_dxPos = Sobel_SplitPosNeg(gray, Horizontal=True, ksize=ksize, UseScharr= False)
         img_dyNeg, img_dyPos = Sobel_SplitPosNeg(gray, Horizontal=False, ksize=ksize, UseScharr= False)
 
+        # (200 ms - 50 ms/img)
         edge_xNeg = get_corners_xy(img_dxNeg, maxCorners)
         edge_xPos = get_corners_xy(img_dxPos, maxCorners)
         edge_yNeg = get_corners_xy(img_dyNeg, maxCorners)
@@ -217,108 +239,237 @@ def get_edges(gray, img_name= None):
         edge_x = np.append(edge_xNeg, edge_xPos, 0)
         edge_y = np.append(edge_yNeg, edge_yPos, 0)
 
-    else:  # Faster sobel without splitting - Result: Dont get as many edges as with splitting
+    else:  # Faster  sobel without splitting - Result: Dont get as many edges as with splitting
+        # (16 ms - 8 ms/img)
         img_dx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=ksize)
         img_dy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=ksize)
+        # (100 ms - 50 ms/img)
         edge_x = get_corners_xy(img_dx, maxCorners)
         edge_y = get_corners_xy(img_dy, maxCorners)
     #show_edges(gray, edge_x, edge_y)
-    #show_edges(gray, edge_x, edge_y, clusters=10)
+    ##xx show_edges(gray, edge_x, edge_y, clusters=10)
 
+    # Conbine X & Y edges
+    edgeS = np.append(edge_x, edge_yNeg, 0)
+    edgeN = edgeS.shape[0]
 
     #### 2D Edge0-Feature Histogram #####
-    pixelsPerBin = 20 #15 # 100 # 15 for small gate
-    hist_x, xbins_x, ybins_x = edge_hist(edge_x, gray, pixelsPerBin)
-    hist_y, xbins_y, ybins_y = edge_hist(edge_y, gray, pixelsPerBin)
-    if False:
-#    if True:
-        plt.subplot(1,3,1), plt.imshow(hist_x, interpolation = 'nearest'), plt.title("X-Hist ")
-        plt.subplot(1,3,2), plt.imshow(hist_y, interpolation = 'nearest'), plt.title("Y-Hist ")
-        plt.subplot(1,3,3), plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
+    pixelsPerBin = 50 #15 # 100 # 15 for small gate
+    hst, hstx, hsty = edge_hist(edgeS, gray, pixelsPerBin)
+    hst = hst.astype(np.uint8)
     
-    ### Line detection ####
-    #lines = cv2.HoughLines(hist_x, 1, np.pi/180, 200) 
-    hst = np.uint8(hist_x)
-    lines = cv2.HoughLinesP(hst, 1, np.pi/180*5, 8, minLineLength=8, maxLineGap=6)
-    if True:
-        if not (lines is None):
-            print(len(lines))
-            hist_l = np.zeros_like(hst)
-            for x1,y1,x2,y2 in lines[:,0]:
-                cv2.line(hist_l,(x1,y1),(x2,y2),(255,255,255),1)
-            plt.subplot(1,2,1), plt.imshow(hist_l, interpolation = 'nearest'), plt.title("X-Lines ")
-            plt.subplot(1,2,2), plt.imshow(hist_y, interpolation = 'nearest'), plt.title("X-Hist ")
-            plt.show()
+    ########## Histogtam blob Filters ##########
+    # https://docs.opencv.org/2.4/modules/imgproc/doc/filtering.html?highlight=cv2.filter2d#cv2.filter2D
+    #cv2.namedWindow("full", cv2.WINDOW_NORMAL)
+    #cv2.setWindowProperty("full", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    
+    # create tmp working copy of hst with 2 extra cols for 0-padding
+    hst_flt = np.zeros((hst.shape[0]+4, hst.shape[1]+4), hst.dtype)
+    hst_flt[2:-2,2:-2] = np.copy(hst)
+    #plt.subplot(1,2,1), plt.imshow(hst_flt), plt.subplot(1,2,2), plt.imshow(hst), plt.show() 
+    hst_01 = hst_flt.clip(max=1)
 
-    if False:
-        ### Blob detection
-        # https://www.learnopencv.com/blob-detection-using-opencv-python-c/    
-        # Set up the detector with default parameters.
-        hst = scale_intensity(hist_x, 5)
-        hst = np.uint8(hst)
-        params = cv2.SimpleBlobDetector_Params()    
-        """ #default params
-        params.blobColor: 0
-        params.filterByArea: True
-        params.filterByCircularity: False
-        params.filterByColor: True
-        params.filterByConvexity: True
-        params.filterByInertia: True
-        params.maxArea: 5000.0
-        params.maxCircularity: 3.4028234663852886e+38
-        params.maxConvexity: 3.4028234663852886e+38
-        params.maxInertiaRatio: 3.4028234663852886e+38
-        params.maxThreshold: 220.0
-        params.minArea: 25.0
-        params.minCircularity: 0.800000011920929
-        params.minConvexity: 0.949999988079071
-        params.minDistBetweenBlobs: 10.0
-        params.minInertiaRatio: 0.10000000149011612
-        params.minRepeatability: 2
-        params.minThreshold: 50.0
-        params.thresholdStep: 10.0
-        """
-        params.filterByArea = True
-        params.filterByCircularity = False
-        params.filterByColor = False
-        params.filterByConvexity = False
-        params.filterByInertia = False
-        params.minArea = 2
-        params.minConvexity = 0
+    flt = np.zeros_like(hst_01)
+    k3 = np.array([ [ 0,-1, 0], 
+                    [-1, 1,-1], 
+                    [ 0,-1, 0] ])
 
-        params.minThreshold = 2
-        params.maxThreshold = 200
-        params.thresholdStep = 10
+    k41 = np.array([[ 0,-1,-1, 0], 
+                    [-1, 0, 1,-1], 
+                    [-1, 0, 0,-1], 
+                    [ 0,-1,-1, 0] ])
+    k42 = np.array([[ 0,-1,-1, 0], 
+                    [-1, 1, 0,-1], 
+                    [-1, 0, 0,-1], 
+                    [ 0,-1,-1, 0] ])
+    k43 = np.array([[ 0,-1,-1, 0], 
+                    [-1, 0, 0,-1], 
+                    [-1, 1, 0,-1], 
+                    [ 0,-1,-1, 0] ])
+    k44 = np.array([[ 0,-1,-1, 0], 
+                    [-1, 0, 0,-1], 
+                    [-1, 0, 1,-1], 
+                    [ 0,-1,-1, 0] ])
 
-        detector = cv2.SimpleBlobDetector_create()
-        keypoints = detector.detect(hst)
-        keyCount = len(keypoints)
-        if 0 < keyCount:        
-            # Draw detected blobs as red circles.
-            # cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS ensures the size of the circle corresponds to the size of blob
-            im_with_keypoints = cv2.drawKeypoints(hst, keypoints, np.array([]), (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)   
-            cv2.imshow("Keypoints", im_with_keypoints)
-            cv2.waitKey(0)
+    k5 = np.array([ [ 0,-1,-1,-1, 0], 
+                    [-1, 0, 0, 0,-1], 
+                    [-1, 0, 1, 0,-1], 
+                    [-1, 0, 0, 0,-1], 
+                    [ 0,-1,-1,-1, 0] ])
+# K3
+    cv2.filter2D(hst_01, -1, k3, dst= flt)
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_01), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+    flt.clip(min=0, out=flt)
+    np.subtract(hst_01, flt, out=hst_01)
+    #np.multiply(hst_flt, hst_01, out= hst_flt) ###
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_flt), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
 
+# K4
+    cv2.filter2D(hst_01, -1, k41, anchor=(2,1), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(flt)) ####
+    #print(cv2.minMaxLoc(hst_01)) ####
+
+    cv2.filter2D(hst_01, -1, k42, anchor=(1,1), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(flt)) ####
+    #print(cv2.minMaxLoc(hst_01)) ####
+
+    cv2.filter2D(hst_01, -1, k43, anchor=(1,2), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(flt)) ####
+    #print(cv2.minMaxLoc(hst_01)) ####
+
+    cv2.filter2D(hst_01, -1, k44, anchor=(2,2), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(hst_01)) ####
+    #np.multiply(hst_flt, hst_01, out= hst_flt) ###
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_flt), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+
+# K3
+    cv2.filter2D(hst_01, -1, k3, dst= flt)
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_01), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+    flt.clip(min=0, out=flt)
+    np.subtract(hst_01, flt, out=hst_01)
+    #np.multiply(hst_flt, hst_01, out= hst_flt) ###
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_flt), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+
+# K5
+    cv2.filter2D(hst_01, -1, k5, dst= flt)
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_01), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+    flt.clip(min=0, out=flt)
+    np.subtract(hst_01, flt, out=hst_01)
+    #np.multiply(hst_flt, hst_01, out= hst_flt) ###
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_flt), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+
+# K3
+    cv2.filter2D(hst_01, -1, k3, dst= flt)
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_01), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+    flt.clip(min=0, out=flt)
+    np.subtract(hst_01, flt, out=hst_01)
+    #np.multiply(hst_flt, hst_01, out= hst_flt) ###
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_flt), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+
+# K4
+    cv2.filter2D(hst_01, -1, k41, anchor=(2,1), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(flt)) ####
+    #print(cv2.minMaxLoc(hst_01)) ####
+
+    cv2.filter2D(hst_01, -1, k42, anchor=(1,1), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(flt)) ####
+    #print(cv2.minMaxLoc(hst_01)) ####
+
+    cv2.filter2D(hst_01, -1, k43, anchor=(1,2), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(flt)) ####
+    #print(cv2.minMaxLoc(hst_01)) ####
+
+    cv2.filter2D(hst_01, -1, k44, anchor=(2,2), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(hst_01)) ####
+    #np.multiply(hst_flt, hst_01, out= hst_flt) ###
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_flt), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+
+# K3
+    cv2.filter2D(hst_01, -1, k3, dst= flt)
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_01), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+    flt.clip(min=0, out=flt)
+    np.subtract(hst_01, flt, out=hst_01)
+    #np.multiply(hst_flt, hst_01, out= hst_flt) ###
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_flt), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+
+# K5
+    cv2.filter2D(hst_01, -1, k5, dst= flt)
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_01), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+    flt.clip(min=0, out=flt)
+    np.subtract(hst_01, flt, out=hst_01)
+    #np.multiply(hst_flt, hst_01, out= hst_flt) ###
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_flt), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+
+# K3
+    cv2.filter2D(hst_01, -1, k3, dst= flt)
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_01), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+    flt.clip(min=0, out=flt)
+    np.subtract(hst_01, flt, out=hst_01)
+    #np.multiply(hst_flt, hst_01, out= hst_flt) ###
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_flt), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+
+# K4
+    cv2.filter2D(hst_01, -1, k41, anchor=(2,1), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(flt)) ####
+    #print(cv2.minMaxLoc(hst_01)) ####
+
+    cv2.filter2D(hst_01, -1, k42, anchor=(1,1), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(flt)) ####
+    #print(cv2.minMaxLoc(hst_01)) ####
+
+    cv2.filter2D(hst_01, -1, k43, anchor=(1,2), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(flt)) ####
+    #print(cv2.minMaxLoc(hst_01)) ####
+
+    cv2.filter2D(hst_01, -1, k44, anchor=(2,2), dst= flt)
+    flt.clip(min=0, out=flt) # <- flt contains the mask of point that will be removed
+    np.subtract(hst_01, flt, out=hst_01)
+    #print(cv2.minMaxLoc(hst_01)) ####
+    #np.multiply(hst_flt, hst_01, out= hst_flt) ###
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_flt), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+
+# K3
+    cv2.filter2D(hst_01, -1, k3, dst= flt)
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_01), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+    flt.clip(min=0, out=flt)
+    np.subtract(hst_01, flt, out=hst_01)
+    #np.multiply(hst_flt, hst_01, out= hst_flt) ###
+    #plt.subplot(1,3,1), plt.imshow(flt), plt.subplot(1,3,2), plt.imshow(hst_flt), plt.subplot(1,3,3), plt.imshow(hst), plt.show()
+
+    #print(cv2.minMaxLoc(hst_01)) ####
+    np.multiply(hst_flt, hst_01, out= hst_flt)
+##xx  plt.subplot(1,3,1), plt.imshow(hst_flt), plt.subplot(1,3,2), plt.imshow(hst), plt.subplot(1,3,3), plt.imshow(gray, 'gray'), plt.show()
+    hst = hst_flt[2:-2,2:-2]
+    ########## Histogtam blob Filters ##########
+
+    # Filter the selected edges based on the final 2D hst
+    x = cv2.minMaxLoc(hst)
+    x
 
     # Center of mass
-    cxx,cxy = np.average(edge_x[:,:,0]), np.average(edge_x[:,:,1])
-    cyx,cyy = np.average(edge_y[:,:,0]), np.average(edge_y[:,:,1])
-    n = edge_x.shape[0] + edge_y.shape[0]
-    cx, cy = int((cxx+ cyx) * edge_x.shape[0]/n) , int((cxy +cyy) * edge_y.shape[0]/n)
+    cx,cy = np.average(edgeS[:,:,0]), np.average(edgeS[:,:,1])
+    
+    if False:
+##xx    if True:  
+        fig, axS = plt.subplots(1,2)
+        ax = axS.ravel()
+        ax[0].plot([int(cx/pixelsPerBin)], [int(cy/pixelsPerBin)], marker='o', markersize=5, color="red")
+        ax[0].imshow(hst, interpolation = 'nearest'), ax[0].set_title("Hist ")
+        ax[1].plot([cx], [cy], marker='+', markersize=15, color="red")
+        ax[1].imshow(gray, 'gray'), ax[1].set_title(img_name)
+        plt.show()
 
     # mean radius of all edges
-    # cv2.minAreaRec() <-- try this
-    rxx,rxy = np.average(np.abs(edge_x[:,:,0] -cx)), np.average(np.abs(edge_x[:,:,1] -cy))
-    ryx,ryy = np.average(np.abs(edge_y[:,:,0] -cx)), np.average(np.abs(edge_y[:,:,1] -cy))
-    rx, ry = int((rxx + ryx)/2), int((rxy + ryy)/2)
+    rx,ry = np.average(np.abs(edgeS[:,:,0] -cx)), np.average(np.abs(edgeS[:,:,1] -cy))
     
     # 0'th order gate position
     x1, y1 = cx +rx, cy -ry
     x2, y2 = cx -rx, cy -ry
     x3, y3 = cx -rx, cy +ry
     x4, y4 = cx +rx, cy +ry
-    return  (x1,y1), (x2,y2), (x3,y3), (x4,y4)
+    return [(x1,y1), (x2,y2), (x3,y3), (x4,y4)]
 
 
 def my_prediction(img, img_name= None):
@@ -351,17 +502,26 @@ def my_prediction(img, img_name= None):
 
     ############## Keep, This realy helps !! ############
     # Clipp highest intensities(Light bulbs & fixtures) to improve gradiants at lower intensities
+#    if False:
     if True:
-        gray = scale_intensity(gray, 255 / (255 - 20))
+        # plt.imshow(gray, 'gray'), plt.title("gray - Original"), plt.show()
+        gray = np.where(gray >= 248, 0, gray) # <- Artifially creates features in overexposed checker areas
+        #gray = scale_intensity(gray, 255 / (255 - 20), dst=gray)
+        # save this trick for the end after we found the gate ROI to make all the edges light up !!!
+        #gray = np.where(gray >= 248, 100, gray) # <- Artifially creates features in overexposed checker areas
+        #gray = scale_intensity(gray, 255 / (255 - 20), dst=gray)
+        #plt.imshow(gray, 'gray'), plt.title("gray - Preprocessed- Clip Max"), plt.show()
 
-    (x1,y1), (x2,y2), (x3,y3), (x4,y4) = get_edges(gray, img_name)
-    dbg_show = True
+    edge_tuples = get_edges(gray, img_name)
+
+##xx    dbg_show = True
     dbg_show = False
     if dbg_show:
         plt.imshow(img)
+        (x1,y1), (x2,y2), (x3,y3), (x4,y4) = edge_tuples
         plt.plot([x1,x2,x3,x4,x1],  [y1,y2,y3,y4,y1], color='r', linewidth=3)
         plt.show()
-    return  (x1,y1), (x2,y2), (x3,y3), (x4,y4)
+    return edge_tuples
 
 
 class GenerateFinalDetections():
@@ -371,8 +531,12 @@ class GenerateFinalDetections():
         self.seed = 2018
         
     def predict(self, img, img_name ="na"):
-        (x1,y1), (x2,y2), (x3,y3), (x4,y4) = my_prediction(img, img_name)
-        bb_all = np.array([x1,y1,x2,y2,x3,y3,x4,y4,0.5])
+        edge_tuples = my_prediction(img, img_name)
+        if edge_tuples is None:
+            bb_all = np.array([])
+        else:
+            (x1,y1), (x2,y2), (x3,y3), (x4,y4) = edge_tuples[:]
+            bb_all = np.array([x1,y1,x2,y2,x3,y3,x4,y4,0.5])
         """
         np.random.seed(self.seed)
         n_boxes = np.random.randint(4)
