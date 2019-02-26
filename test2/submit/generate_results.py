@@ -9,6 +9,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import math
 import time
+#from scipy import stats
 
 
 def ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues = False):
@@ -254,7 +255,7 @@ def get_edges(gray, img_name= None):
     edgeN = edgeS.shape[0]
 
     #### 2D Edge0-Feature Histogram #####
-    pixelsPerBin = 50 #15 # 100 # 15 for small gate
+    pixelsPerBin = 30 #15 # 100 # 15 for small gate
     hst, hstx, hsty = edge_hist(edgeS, gray, pixelsPerBin)
     hst = hst.astype(np.uint8)
     
@@ -441,35 +442,79 @@ def get_edges(gray, img_name= None):
     #print(cv2.minMaxLoc(hst_01)) ####
     np.multiply(hst_flt, hst_01, out= hst_flt)
 ##xx  plt.subplot(1,3,1), plt.imshow(hst_flt), plt.subplot(1,3,2), plt.imshow(hst), plt.subplot(1,3,3), plt.imshow(gray, 'gray'), plt.show()
-    hst = hst_flt[2:-2,2:-2]
+    hst = hst_flt[2:-2, 2:-2]
+    hst_01 = hst_01[2:-2,2:-2]
     ########## Histogtam blob Filters ##########
 
-    # Filter the selected edges based on the final 2D hst
-    x = cv2.minMaxLoc(hst)
-    x
+    # Filter the selected edges based on the innew & outer edges of the final 2D hst
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
+    axisx, axisy = np.arange(hst_01.shape[1]), np.arange(hst_01.shape[0])
+    wghtx, wghty = np.sum(hst_01, axis=0).astype(np.single) , np.sum(hst_01, axis=1).astype(np.single)
+    avgx = avgy = None
+    if 0 < wghtx.size:
+        avgx = np.average(axisx, weights=wghtx)
+        posx = wghtx[int(avgx):]
+        negx = wghtx[:int(avgx)]
+        _, _, (_, outx), (_, inx) = cv2.minMaxLoc(np.diff(posx))    # find min,max derivatives
+        _, _, (_, cx1in), (_, cx1out) = cv2.minMaxLoc(np.diff(negx))
+        cx2in, cx2out = avgx + inx, avgx + outx + 1
+        cx1in += 1  # +1 because of float->int truncation
+        # Do sanity checks beacuse the derivative for the inner box is not very stable
+        if (cx1in < cx1out):
+            cx1in = cx1out
+        if (cx2out < cx2in):
+            cx2in = cx2out
+        if cx1in == cx1out and cx2in != cx2out:
+            cx1in = cx1out + abs(cx2in - cx2out)
+        if cx2in == cx2out and cx1in != cx1out:
+            cx2in = cx2out - abs(cx1in - cx1out)
+    if 0 < wghty.size:
+        avgy = np.average(axisy, weights=wghty)
+        posy = wghty[int(avgy):]
+        negy = wghty[:int(avgy)]
+        _, _, (_, outy), (_, iny) = cv2.minMaxLoc(np.diff(posy))    # find min,max derivatives
+        _, _, (_, cy1in), (_, cy1out) = cv2.minMaxLoc(np.diff(negy))
+        cy2in, cy2out = avgy + iny, avgy + outy +1
+        cy1in += 1  # +1 because of float->int truncation
+        # Do sanity checks beacuse the derivative for the inner box is not very stable
+        if (cy1in < cy1out):
+            cy1in = cy1out
+        if (cy2out < cy2in):
+            cy2in = cy2out
+        if cy1in == cy1out and cy2in != cy2out:
+            cy1in = cy1out + abs(cy2in - cy2out)
+        if cy2in == cy2out and cy1in != cy1out:
+            cy2in = cy2out - abs(cy1in - cy1out)
 
-    # Center of mass
-    cx,cy = np.average(edgeS[:,:,0]), np.average(edgeS[:,:,1])
-    
-    if False:
-##xx    if True:  
-        fig, axS = plt.subplots(1,2)
-        ax = axS.ravel()
-        ax[0].plot([int(cx/pixelsPerBin)], [int(cy/pixelsPerBin)], marker='o', markersize=5, color="red")
-        ax[0].imshow(hst, interpolation = 'nearest'), ax[0].set_title("Hist ")
-        ax[1].plot([cx], [cy], marker='+', markersize=15, color="red")
-        ax[1].imshow(gray, 'gray'), ax[1].set_title(img_name)
-        plt.show()
+    chin = np.array([ [cx2in, cy1in], [cx1in, cy1in], [cx1in, cy2in], [cx2in, cy2in] ])
+    chout = np.array([[cx2out, cy1out], [cx1out, cy1out], [cx1out, cy2out], [cx2out, cy2out]])
+    cx, cy = avgx * pixelsPerBin, avgy * pixelsPerBin
+    cin = (chin + 0.5) * pixelsPerBin
+    cout = (chout + 0.5) * pixelsPerBin
 
     # mean radius of all edges
-    rx,ry = np.average(np.abs(edgeS[:,:,0] -cx)), np.average(np.abs(edgeS[:,:,1] -cy))
-    
-    # 0'th order gate position
-    x1, y1 = cx +rx, cy -ry
-    x2, y2 = cx -rx, cy -ry
-    x3, y3 = cx -rx, cy +ry
-    x4, y4 = cx +rx, cy +ry
-    return [(x1,y1), (x2,y2), (x3,y3), (x4,y4)]
+    # rx,ry = np.average(np.abs(edgeS[:,:,0] -cx)), np.average(np.abs(edgeS[:,:,1] -cy))
+        
+    ##xx    if False:
+    if True:
+        fig, axS = plt.subplots(1,2)
+        ax = axS.ravel()
+        ax[0].plot([avgx], [avgy], marker='o', markersize=5, color="red")
+        pxin, pyin = np.append(chin[:, 0], chin[0, 0]), np.append(chin[:, 1], chin[0, 1])
+        ax[0].plot(pxin, pyin, color="yellow")
+        pxout, pyout = np.append(chout[:, 0], chout[0, 0]), np.append(chout[:, 1], chout[0, 1])
+        ax[0].plot(pxout, pyout, color="red")
+        ax[0].imshow(hst, interpolation='nearest'), ax[0].set_title("Hist ")
+        
+        ax[1].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxin, pyin = np.append(cin[:, 0], cin[0, 0]), np.append(cin[:, 1], cin[0, 1])
+        ax[1].plot(pxin, pyin, color="yellow", linewidth=3)
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[1].plot(pxout, pyout, color="red", linewidth=3)
+        ax[1].imshow(gray, 'gray'), ax[1].set_title(img_name)
+        plt.show()
+  
+    return cin, cout, (cx, cy)
 
 
 def my_prediction(img, img_name= None):
@@ -505,23 +550,35 @@ def my_prediction(img, img_name= None):
 #    if False:
     if True:
         # plt.imshow(gray, 'gray'), plt.title("gray - Original"), plt.show()
-        gray = np.where(gray >= 248, 0, gray) # <- Artifially creates features in overexposed checker areas
-        #gray = scale_intensity(gray, 255 / (255 - 20), dst=gray)
+        #gray = np.where(gray >= 248, 0, gray)  # <- Artifially creates features in overexposed checker areas
+        #gray = np.where(gray >= 248, 100, gray) # <- Artifially creates features in overexposed checker areas
+        gray = scale_intensity(gray, 255 / (255 - 20), dst=gray)
         # save this trick for the end after we found the gate ROI to make all the edges light up !!!
         #gray = np.where(gray >= 248, 100, gray) # <- Artifially creates features in overexposed checker areas
         #gray = scale_intensity(gray, 255 / (255 - 20), dst=gray)
         #plt.imshow(gray, 'gray'), plt.title("gray - Preprocessed- Clip Max"), plt.show()
 
-    edge_tuples = get_edges(gray, img_name)
+    cin, cout, (cx, cy) = get_edges(gray, img_name)
+
+    ####### TODO #######
+    ### Find the exact gate corner positions by analyzing the image 
+    ### within the inner & outer box ROI's found by get_edges()
+    cavg = np.add(cin, cout) /2
+    ####### TODO #######
 
 ##xx    dbg_show = True
     dbg_show = False
     if dbg_show:
-        plt.imshow(img)
-        (x1,y1), (x2,y2), (x3,y3), (x4,y4) = edge_tuples
-        plt.plot([x1,x2,x3,x4,x1],  [y1,y2,y3,y4,y1], color='r', linewidth=3)
+        plt.plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxin, pyin = np.append(cin[:, 0], cin[0, 0]), np.append(cin[:, 1], cin[0, 1])
+        plt.plot(pxin, pyin, color="yellow", linewidth=3)
+        pxin, pyin = np.append(cavg[:, 0], cavg[0, 0]), np.append(cavg[:, 1], cavg[0, 1])
+        plt.plot(pxin, pyin, color="green", linewidth=3)
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        plt.plot(pxout, pyout, color="red", linewidth=3)
+        plt.imshow(gray, 'gray'), plt.title(img_name)
         plt.show()
-    return edge_tuples
+    return cavg
 
 
 class GenerateFinalDetections():
@@ -531,20 +588,10 @@ class GenerateFinalDetections():
         self.seed = 2018
         
     def predict(self, img, img_name ="na"):
-        edge_tuples = my_prediction(img, img_name)
-        if edge_tuples is None:
+        edges = my_prediction(img, img_name)
+        if edges is None:
             bb_all = np.array([])
         else:
-            (x1,y1), (x2,y2), (x3,y3), (x4,y4) = edge_tuples[:]
-            bb_all = np.array([x1,y1,x2,y2,x3,y3,x4,y4,0.5])
-        """
-        np.random.seed(self.seed)
-        n_boxes = np.random.randint(4)
-        if n_boxes>0:
-            bb_all = 400*np.random.uniform(size = (n_boxes,9))
-            bb_all[:,-1] = 0.5
-        else:
-            bb_all = []
-        """            
+            bb_all = np.append(edges, .5)
         return bb_all.tolist()
         
