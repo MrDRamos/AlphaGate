@@ -10,7 +10,8 @@ from matplotlib import pyplot as plt
 import math
 import time
 #from scipy import stats
-
+from scipy.ndimage import maximum_filter1d, minimum_filter1d
+from scipy.signal import medfilt
 
 def ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues = False):
     tmp = cv2.scaleAdd(SrcArray, 255.4999/MaxFloat -1, SrcArray)
@@ -450,13 +451,19 @@ def get_edges(gray, img_name= None):
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
     axisx, axisy = np.arange(hst_01.shape[1]), np.arange(hst_01.shape[0])
     wghtx, wghty = np.sum(hst_01, axis=0).astype(np.single) , np.sum(hst_01, axis=1).astype(np.single)
+    wghtxmin, wghtxmax = minimum_filter1d(wghtx, 3), maximum_filter1d(wghtx, 3)
+    wghtymin, wghtymax = minimum_filter1d(wghty, 3), maximum_filter1d(wghty, 3)
+    _wghtx, _wghty = np.sum(hst_flt, axis=0).astype(np.single) , np.sum(hst_flt, axis=1).astype(np.single)
+    wghtxmed, wghtymed = minimum_filter1d(hst_01, 3), minimum_filter1d(_wghty, 3)
+    #wghtxmed = _wghtx
     avgx = avgy = None
     if 0 < wghtx.size:
         avgx = np.average(axisx, weights=wghtx)
-        posx = wghtx[int(avgx):]
-        negx = wghtx[:int(avgx)]
-        _, _, (_, outx), (_, inx) = cv2.minMaxLoc(np.diff(posx))    # find min,max derivatives
-        _, _, (_, cx1in), (_, cx1out) = cv2.minMaxLoc(np.diff(negx))
+        # The maxfilter help tremendously when taking derivatives with data dropout along the gate edges
+        _, _, _, (_, inx) = cv2.minMaxLoc(np.diff(wghtxmed)[int(avgx):])
+        _, _, (_, outx), _ = cv2.minMaxLoc(np.diff(wghtxmax[int(avgx):]))
+        _, _, (_, cx1in), _ = cv2.minMaxLoc(np.diff(wghtxmed)[:int(avgx)])
+        _, _, _, (_, cx1out) = cv2.minMaxLoc(np.diff(wghtxmax[:int(avgx)]))
         cx2in, cx2out = avgx + inx, avgx + outx + 1
         cx1in += 1  # +1 because of float->int truncation
         # Do sanity checks beacuse the derivative for the inner box is not very stable
@@ -470,10 +477,11 @@ def get_edges(gray, img_name= None):
             cx2in = cx2out - abs(cx1in - cx1out)
     if 0 < wghty.size:
         avgy = np.average(axisy, weights=wghty)
-        posy = wghty[int(avgy):]
-        negy = wghty[:int(avgy)]
-        _, _, (_, outy), (_, iny) = cv2.minMaxLoc(np.diff(posy))    # find min,max derivatives
-        _, _, (_, cy1in), (_, cy1out) = cv2.minMaxLoc(np.diff(negy))
+        # The maxfilter help tremendously when taking derivatives with data dropout along the gate edges
+        _, _, _, (_, iny) = cv2.minMaxLoc(np.diff(wghtymed)[int(avgy):])
+        _, _, (_, outy), _ = cv2.minMaxLoc(np.diff(wghtymax[int(avgy):]))
+        _, _, (_, cy1in), _ = cv2.minMaxLoc(np.diff(wghtymed)[:int(avgy)])
+        _, _, _, (_, cy1out) = cv2.minMaxLoc(np.diff(wghtymax[:int(avgy)]))
         cy2in, cy2out = avgy + iny, avgy + outy +1
         cy1in += 1  # +1 because of float->int truncation
         # Do sanity checks beacuse the derivative for the inner box is not very stable
