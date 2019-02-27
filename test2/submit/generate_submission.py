@@ -28,7 +28,7 @@ if train:
     #data_ofs = img_keys.index('IMG_0638.JPG')  # large + angle
     #data_ofs = img_keys.index('IMG_0664.JPG')  # large + angle
     #data_ofs = img_keys.index('IMG_0681.JPG') # large + angle    
-    #data_ofs = img_keys.index('IMG_0711.JPG') # small + angle
+    data_ofs = img_keys.index('IMG_0711.JPG') # small + angle
 
     train_qty = 20
     Validate_qty = 2
