@@ -452,8 +452,8 @@ def get_edges(gray, img_name= None):
     # Filter the selected edges based on the innew & outer edges of the final 2D hst
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
     wghtx, wghty = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
-    xmax = find_peaks(wghtx, distance=3)[0]
-    ymax = find_peaks(wghty, distance=6)[0]
+    xmax = find_peaks(wghtx, distance=3)[0].astype(np.int)
+    ymax = find_peaks(wghty, distance=6)[0].astype(np.int)
     xwgt, ywgt = wghtx[xmax], wghty[ymax] # get the corresponding peak values
     xsrt, ysrt = np.argsort(xwgt), np.argsort(ywgt)  # get array to sort by peaks
     # we want coordinates of the largest 2 peaks
@@ -461,6 +461,47 @@ def get_edges(gray, img_name= None):
     py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
     px, py = np.sort(px), np.sort(py) # sort the coord from low to high
 
+################# 
+    """
+    #dx, dy = px[1]-px[0], py[1]-py[]
+    revalx = revaly = False
+    zeros = [ w for w in wghtx[px[0]:px[1]] if w == 0 ]
+    if (3 <= len(zeros)):
+        pc = int((px[0] + px[1])/2.0)
+        hstIy = np.sum(hst, axis=1)
+        hstIxy = np.cumsum(hstIy)
+        wgtIn, wgtIp = hstIxy[pc] - hstIxy[px[0]] , hstIxy[px[1]] - hstIxy[pc]
+        if 2 *wgtIn < wgtIp:
+            revalx = True
+            hst_01[pc:hst_01.size] = 0
+        else: 
+            if 2 *wgtIp < wgtIn:
+                revalx = True
+                hst_01[0:pc] = 0
+    if revalx:
+        wghtx, wghty = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
+        xmax = find_peaks(wghtx, distance=3)[0]
+        ymax = find_peaks(wghty, distance=6)[0]
+        xwgt, ywgt = wghtx[xmax], wghty[ymax] # get the corresponding peak values
+        xsrt, ysrt = np.argsort(xwgt), np.argsort(ywgt)  # get array to sort by peaks
+        # we want coordinates of the largest 2 peaks
+        px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
+        py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
+        px, py = np.sort(px), np.sort(py) # sort the coord from low to high
+    """
+
+    """
+#    ex = [ wghtx[i]==0 for i in wghtx[px[0]:px[1] ]
+    if (ex)
+    axisx, axisy = np.arange(hst_01.shape[1]), np.arange(hst_01.shape[0])
+    wghtx, wghty = np.sum(hst_01, axis=0).astype(np.single) , np.sum(hst_01, axis=1).astype(np.single)
+    avgx = avgy = None
+    if 0 < wghtx.size:
+        avgx = np.average(axisx, weights=wghtx)
+        posx = wghtx[int(avgx):]
+        negx = wghtx[:int(avgx)]
+     """
+#############
     chout = np.array([ [px[1], py[0]], [px[0], py[0]], [px[0], py[1]], [px[1], py[1]] ])
     medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
     cx, cy = medx * pixelsPerBin, medy * pixelsPerBin
