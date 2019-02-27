@@ -9,7 +9,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import math
 import time
-#from scipy import stats
+from scipy.ndimage import maximum_filter1d
+from scipy.signal import find_peaks
 
 
 def ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues = False):
@@ -255,7 +256,7 @@ def get_edges(gray, img_name= None):
     edgeN = edgeS.shape[0]
 
     #### 2D Edge0-Feature Histogram #####
-    pixelsPerBin = 30 #15 # 100 # 15 for small gate
+    pixelsPerBin = 20 #15 # 100 # 15 for small gate
     hst, hstx, hsty = edge_hist(edgeS, gray, pixelsPerBin)
     hst = hst.astype(np.uint8)
     
@@ -446,75 +447,43 @@ def get_edges(gray, img_name= None):
     hst_01 = hst_01[2:-2,2:-2]
     ########## Histogtam blob Filters ##########
 
+
+
     # Filter the selected edges based on the innew & outer edges of the final 2D hst
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
-    axisx, axisy = np.arange(hst_01.shape[1]), np.arange(hst_01.shape[0])
-    wghtx, wghty = np.sum(hst_01, axis=0).astype(np.single) , np.sum(hst_01, axis=1).astype(np.single)
-    avgx = avgy = None
-    if 0 < wghtx.size:
-        avgx = np.average(axisx, weights=wghtx)
-        posx = wghtx[int(avgx):]
-        negx = wghtx[:int(avgx)]
-        _, _, (_, outx), (_, inx) = cv2.minMaxLoc(np.diff(posx))    # find min,max derivatives
-        _, _, (_, cx1in), (_, cx1out) = cv2.minMaxLoc(np.diff(negx))
-        cx2in, cx2out = avgx + inx, avgx + outx + 1
-        cx1in += 1  # +1 because of float->int truncation
-        # Do sanity checks beacuse the derivative for the inner box is not very stable
-        if (cx1in < cx1out):
-            cx1in = cx1out
-        if (cx2out < cx2in):
-            cx2in = cx2out
-        if cx1in == cx1out and cx2in != cx2out:
-            cx1in = cx1out + abs(cx2in - cx2out)
-        if cx2in == cx2out and cx1in != cx1out:
-            cx2in = cx2out - abs(cx1in - cx1out)
-    if 0 < wghty.size:
-        avgy = np.average(axisy, weights=wghty)
-        posy = wghty[int(avgy):]
-        negy = wghty[:int(avgy)]
-        _, _, (_, outy), (_, iny) = cv2.minMaxLoc(np.diff(posy))    # find min,max derivatives
-        _, _, (_, cy1in), (_, cy1out) = cv2.minMaxLoc(np.diff(negy))
-        cy2in, cy2out = avgy + iny, avgy + outy +1
-        cy1in += 1  # +1 because of float->int truncation
-        # Do sanity checks beacuse the derivative for the inner box is not very stable
-        if (cy1in < cy1out):
-            cy1in = cy1out
-        if (cy2out < cy2in):
-            cy2in = cy2out
-        if cy1in == cy1out and cy2in != cy2out:
-            cy1in = cy1out + abs(cy2in - cy2out)
-        if cy2in == cy2out and cy1in != cy1out:
-            cy2in = cy2out - abs(cy1in - cy1out)
+    wghtx, wghty = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
+    xmax = find_peaks(wghtx, distance=3)[0]
+    ymax = find_peaks(wghty, distance=6)[0]
+    xwgt, ywgt = wghtx[xmax], wghty[ymax] # get the corresponding peak values
+    xsrt, ysrt = np.argsort(xwgt), np.argsort(ywgt)  # get array to sort by peaks
+    # we want coordinates of the largest 2 peaks
+    px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
+    py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
+    px, py = np.sort(px), np.sort(py) # sort the coord from low to high
 
-    chin = np.array([ [cx2in, cy1in], [cx1in, cy1in], [cx1in, cy2in], [cx2in, cy2in] ])
-    chout = np.array([[cx2out, cy1out], [cx1out, cy1out], [cx1out, cy2out], [cx2out, cy2out]])
-    cx, cy = avgx * pixelsPerBin, avgy * pixelsPerBin
-    cin = (chin + 0.5) * pixelsPerBin
+    chout = np.array([ [px[1], py[0]], [px[0], py[0]], [px[0], py[1]], [px[1], py[1]] ])
+    medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
+    cx, cy = medx * pixelsPerBin, medy * pixelsPerBin
     cout = (chout + 0.5) * pixelsPerBin
 
-    # mean radius of all edges
-    # rx,ry = np.average(np.abs(edgeS[:,:,0] -cx)), np.average(np.abs(edgeS[:,:,1] -cy))
-        
     ##xx    if False:
     if True:
         fig, axS = plt.subplots(1,2)
         ax = axS.ravel()
-        ax[0].plot([avgx], [avgy], marker='o', markersize=5, color="red")
-        pxin, pyin = np.append(chin[:, 0], chin[0, 0]), np.append(chin[:, 1], chin[0, 1])
-        ax[0].plot(pxin, pyin, color="yellow")
+        #ax[0].plot([avgx], [avgy], marker='o', markersize=5, color="yellow")
+        ax[0].plot([medx], [medy], marker='+', markersize=7, color="red")
         pxout, pyout = np.append(chout[:, 0], chout[0, 0]), np.append(chout[:, 1], chout[0, 1])
         ax[0].plot(pxout, pyout, color="red")
         ax[0].imshow(hst, interpolation='nearest'), ax[0].set_title("Hist ")
         
         ax[1].plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxin, pyin = np.append(cin[:, 0], cin[0, 0]), np.append(cin[:, 1], cin[0, 1])
-        ax[1].plot(pxin, pyin, color="yellow", linewidth=3)
         pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        ax[1].plot(pxout, pyout, color="red", linewidth=3)
+        ax[1].plot(pxout, pyout, color="red", linewidth=1)
         ax[1].imshow(gray, 'gray'), ax[1].set_title(img_name)
         plt.show()
   
-    return cin, cout, (cx, cy)
+    return cout, (cx, cy)
+
 
 
 def my_prediction(img, img_name= None):
@@ -558,27 +527,22 @@ def my_prediction(img, img_name= None):
         #gray = scale_intensity(gray, 255 / (255 - 20), dst=gray)
         #plt.imshow(gray, 'gray'), plt.title("gray - Preprocessed- Clip Max"), plt.show()
 
-    cin, cout, (cx, cy) = get_edges(gray, img_name)
+    cout, (cx, cy) = get_edges(gray, img_name)
 
     ####### TODO #######
     ### Find the exact gate corner positions by analyzing the image 
     ### within the inner & outer box ROI's found by get_edges()
-    cavg = np.add(cin, cout) /2
     ####### TODO #######
 
 ##xx    dbg_show = True
     dbg_show = False
     if dbg_show:
         plt.plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxin, pyin = np.append(cin[:, 0], cin[0, 0]), np.append(cin[:, 1], cin[0, 1])
-        plt.plot(pxin, pyin, color="yellow", linewidth=3)
-        pxin, pyin = np.append(cavg[:, 0], cavg[0, 0]), np.append(cavg[:, 1], cavg[0, 1])
-        plt.plot(pxin, pyin, color="green", linewidth=3)
         pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
         plt.plot(pxout, pyout, color="red", linewidth=3)
         plt.imshow(gray, 'gray'), plt.title(img_name)
         plt.show()
-    return cavg
+    return cout
 
 
 class GenerateFinalDetections():
