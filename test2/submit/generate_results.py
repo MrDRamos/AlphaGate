@@ -505,122 +505,25 @@ def get_edges(gray, img_name= None):
     hst_01[pr[1]:, :] = 0
     # plt.imshow(hst_01), plt.show()
 
+
+
+
     # Filter the selected edges based on the innew & outer edges of the final 2D hst
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
-    #hsumy, hsumx = np.sum(hst_01, axis=0), np.sum(hst_01, axis=1)
     hst_flt = np.multiply(hst_01, hst)
-    wsumy0, wsumx0 = np.sum(hst_flt, axis=0), np.sum(hst_flt, axis=1)
-    wsumy, wsumx = maximum_filter1d(wsumy0, size=3), maximum_filter1d(wsumx0, size=3)
-    
-    pxM, pyM = px, py  # Save px & py from blob analysis in case we have to meany peaks
-    dx, dy = px[1] - px[0], py[1] - py[0]
-    if dx < 20:
-        dist = 1
-    else:
-        dist = 4
-    xmax = find_peaks(wsumy, distance=1)[0]
-    if xmax.size < 2:
-        xmax = find_peaks(wsumy, distance=dist)[0]
-    if xmax.size < 4:
-        pxM = None
+    wsumy, wsumx = np.sum(hst_flt, axis=0), np.sum(hst_flt, axis=1)
 
-    if dy < 20:
-        dist = 2
-    else:
-        dist = 6
-    ymax = find_peaks(wsumx, distance=2)[0]
-    if ymax.size < 2:
-        ymax = find_peaks(wsumx0, distance=dist)[0]
-    if ymax.size < 4:
-        pyM = None
+    peaks = find_peaks(wsumy, prominence=1)
+    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
+    if 1 < pmax.size:
+        px = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
 
-    #psumy, psumx = hsumy[xmax], hsumx[ymax]  # get the corresponding peak values
-    psumy, psumx = wsumy[xmax], wsumx[ymax]  # get the corresponding peak values
-    xsrt, ysrt = np.argsort(psumy), np.argsort(psumx)  # get array to sort by peaks
-    # we want coordinates of the largest 2 peaks
-    px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
-    py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
+    peaks = find_peaks(wsumx, prominence=1)
+    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
+    if 1 < pmax.size:
+        py = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+
     px, py = np.sort(px), np.sort(py) # sort the coord from low to high
-    # plt.imshow(hst_01), plt.show()
-    if not pxM is None:
-        px = pxM
-    if not pyM is None:
-        py = pyM
-################# 
-    """
-    wghtrng = hsumy[px[0]:px[1]]
-    zeros = [w for w in wghtrng if w == 0]
-    zeros = len(zeros)
-    skew = (px[1]-px[0])/(py[1]-py[0]+1)
-    #dens = np.sum(wghtrng)/(px[1]-px[0])
-    if 100 <= skew * zeros * pixelsPerBin:
-        pc = int((px[0] + px[1])/2.0)
-        hstIy = np.sum(hst, axis=0)
-        hstIxy = np.cumsum(hstIy)
-        wgtIn, wgtIp = hstIxy[pc] - hstIxy[px[0]] , hstIxy[px[1]] - hstIxy[pc]
-        if 2 *wgtIn < wgtIp:
-            revalx = True
-            pc2 = int(max(px[0]+zeros/2, pc-zeros/2))
-            hst_01[:, 0:pc2] = 0
-        else:
-            if 2 *wgtIp < wgtIn:
-                revalx = True
-                pc2 = int(min(pc+zeros/2, px[1]-zeros/2))
-                hst_01[:, pc2:hst_01.size] = 0
-    if revalx:
-        revalx = revaly = False
-        hsumy, hsumx = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
-        xmax = find_peaks(hsumy, distance=3)[0]
-        if xmax.size < 2:
-            xmax = find_peaks(hsumy)[0]
-        ymax = find_peaks(hsumx, distance=6)[0]
-        if ymax.size < 2:
-            ymax = find_peaks(hsumx)[0]
-        xwgt, ywgt = hsumy[xmax], hsumx[ymax] # get the corresponding peak values
-        xsrt, ysrt = np.argsort(xwgt), np.argsort(ywgt)  # get array to sort by peaks
-        # we want coordinates of the largest 2 peaks
-        px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
-        py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
-        px, py = np.sort(px), np.sort(py)  # sort the coord from low to high
-
-        wghtrng = hsumy[px[0]:px[1]]
-        zeros = [w for w in wghtrng if w == 0]
-        zeros = len(zeros)
-        skew = (px[1]-px[0])/(py[1]-py[0]+1)
-        #dens = np.sum(wghtrng)/(px[1]-px[0])
-        if 100 <= skew * zeros * pixelsPerBin:
-            pc = int((px[0] + px[1])/2.0)
-            hstIy = np.sum(hst, axis=0)
-            hstIxy = np.cumsum(hstIy)
-            wgtIn, wgtIp = hstIxy[pc] - hstIxy[px[0]], hstIxy[px[1]] - hstIxy[pc]
-            if 2 * wgtIn < wgtIp:
-                revalx = True
-                pc2 = int(max(px[0]+zeros/2, pc-zeros/2))
-                hst_01[:,0:pc2] = 0
-            else:
-                if 2 * wgtIp < wgtIn:
-                    revalx = True
-                    pc2 = int(min(pc+zeros/2, px[1]-zeros/2))
-                    hst_01[:,pc2:hst_01.size] = 0
-        if revalx:
-            plt.imshow(hst_01), plt.show()
-            revalx = revaly = False
-            hsumy, hsumx = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
-            xmax = find_peaks(hsumy, distance=3)[0]
-            if xmax.size < 2:
-                xmax = find_peaks(hsumy)[0]
-            ymax = find_peaks(hsumx, distance=6)[0]
-            if ymax.size < 2:
-                ymax = find_peaks(hsumx)[0]
-            # get the corresponding peak values
-            xwgt, ywgt = hsumy[xmax], hsumx[ymax]
-            xsrt, ysrt = np.argsort(xwgt), np.argsort(ywgt)  # get array to sort by peaks
-            # we want coordinates of the largest 2 peaks
-            px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
-            py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
-            px, py = np.sort(px), np.sort(py)  # sort the coord from low to high
-    """
-#############
     chout = np.array([ [px[1], py[0]], [px[0], py[0]], [px[0], py[1]], [px[1], py[1]] ])
     medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
     cx, cy = medx * pixelsPerBin, medy * pixelsPerBin
