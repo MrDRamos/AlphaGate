@@ -449,25 +449,69 @@ def get_edges(gray, img_name= None):
 
 
 
+    # find the predominant blob
+    filtsize = 5
+    hsumy, hsumx = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
+    hsumy, hsumx = maximum_filter1d(hsumy, size=filtsize), maximum_filter1d(hsumx, size=filtsize)
+    xmax = find_peaks(hsumy)[0]
+    ymax = find_peaks(hsumx)[0]
+
+    # Sanity check in case the image has no blobs
+    if 0 == xmax.size or 0 == ymax.size:
+        return np.array([[],[]]), (0,0)
+
+    psumy, psumx = hsumy[xmax], hsumx[ymax]  # get the corresponding peak values
+    xsrt, ysrt = np.argsort(psumy), np.argsort(psumx)  # get array to sort by peaks
+    # we want coordinates of the largest 2 peaks
+    px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
+    py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
+    px, py = np.sort(px), np.sort(py)  # sort the coord from low to high
+    
+    # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
+    span = hsumy[px[0]:px[1]]
+    zeros = len([w for w in span if w == 0])
+    if max(0,span.size - filtsize) < 3 * zeros:
+        psum = hsumy
+        pm = xmax[xsrt[xsrt.size - 1]] #pm = xmax[xmax.size - 1]
+        p0 = pm - np.flip(psum[0:pm]).argmin(axis=0)
+        p1 = pm + psum[pm:psum.size].argmin(axis=0)
+        hst_01[:,:p0] = 0
+        hst_01[:,p1:] = 0
+
+    # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
+    span = hsumx[py[0]:py[1]]
+    zeros = len([w for w in span if w == 0])
+    if max(0,span.size - filtsize) < 3 * zeros:
+        psum = hsumx
+        pm = ymax[ysrt[ysrt.size - 1]]  #ymax[ymax.size - 1]
+        p0 = pm - np.flip(psum[0:pm]).argmin(axis=0)
+        p1 = pm + psum[pm:psum.size].argmin(axis=0)
+        hst_01[:p0, :] = 0
+        hst_01[p1:, :] = 0
+
     # Filter the selected edges based on the innew & outer edges of the final 2D hst
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
-    revalx = revaly = False
-    wghtx, wghty = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
-    xmax = find_peaks(wghtx, distance=3)[0]
-    if xmax.size < 2:
-        xmax = find_peaks(wghtx)[0]
-    ymax = find_peaks(wghty, distance=6)[0]
-    if ymax.size < 2:
-        ymax = find_peaks(wghty)[0]
-    xwgt, ywgt = wghtx[xmax], wghty[ymax]  # get the corresponding peak values
-    xsrt, ysrt = np.argsort(xwgt), np.argsort(ywgt)  # get array to sort by peaks
+    hsumy, hsumx = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
+    hst_flt = np.multiply(hst_01, hst)
+    wsumy, wsumx = np.sum(hst_flt, axis=0), np.sum(hst_flt, axis=1)
+    
+    xmax = find_peaks(wsumy, distance=1)[0]
+#   if xmax.size < 2:
+        #TODO
+    ymax = find_peaks(wsumx, distance=2)[0]
+#   if ymax.size < 2:
+        #TODO
+    #psumy, psumx = hsumy[xmax], hsumx[ymax]  # get the corresponding peak values
+    psumy, psumx = wsumy[xmax], wsumx[ymax]  # get the corresponding peak values
+    xsrt, ysrt = np.argsort(psumy), np.argsort(psumx)  # get array to sort by peaks
     # we want coordinates of the largest 2 peaks
     px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
     py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
     px, py = np.sort(px), np.sort(py) # sort the coord from low to high
 
 ################# 
-    wghtrng = wghtx[px[0]:px[1]]
+    """
+    wghtrng = hsumy[px[0]:px[1]]
     zeros = [w for w in wghtrng if w == 0]
     zeros = len(zeros)
     skew = (px[1]-px[0])/(py[1]-py[0]+1)
@@ -488,21 +532,21 @@ def get_edges(gray, img_name= None):
                 hst_01[:, pc2:hst_01.size] = 0
     if revalx:
         revalx = revaly = False
-        wghtx, wghty = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
-        xmax = find_peaks(wghtx, distance=3)[0]
+        hsumy, hsumx = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
+        xmax = find_peaks(hsumy, distance=3)[0]
         if xmax.size < 2:
-            xmax = find_peaks(wghtx)[0]
-        ymax = find_peaks(wghty, distance=6)[0]
+            xmax = find_peaks(hsumy)[0]
+        ymax = find_peaks(hsumx, distance=6)[0]
         if ymax.size < 2:
-            ymax = find_peaks(wghty)[0]
-        xwgt, ywgt = wghtx[xmax], wghty[ymax] # get the corresponding peak values
+            ymax = find_peaks(hsumx)[0]
+        xwgt, ywgt = hsumy[xmax], hsumx[ymax] # get the corresponding peak values
         xsrt, ysrt = np.argsort(xwgt), np.argsort(ywgt)  # get array to sort by peaks
         # we want coordinates of the largest 2 peaks
         px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
         py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
         px, py = np.sort(px), np.sort(py)  # sort the coord from low to high
 
-        wghtrng = wghtx[px[0]:px[1]]
+        wghtrng = hsumy[px[0]:px[1]]
         zeros = [w for w in wghtrng if w == 0]
         zeros = len(zeros)
         skew = (px[1]-px[0])/(py[1]-py[0]+1)
@@ -524,21 +568,21 @@ def get_edges(gray, img_name= None):
         if revalx:
             plt.imshow(hst_01), plt.show()
             revalx = revaly = False
-            wghtx, wghty = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
-            xmax = find_peaks(wghtx, distance=3)[0]
+            hsumy, hsumx = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
+            xmax = find_peaks(hsumy, distance=3)[0]
             if xmax.size < 2:
-                xmax = find_peaks(wghtx)[0]
-            ymax = find_peaks(wghty, distance=6)[0]
+                xmax = find_peaks(hsumy)[0]
+            ymax = find_peaks(hsumx, distance=6)[0]
             if ymax.size < 2:
-                ymax = find_peaks(wghty)[0]
+                ymax = find_peaks(hsumx)[0]
             # get the corresponding peak values
-            xwgt, ywgt = wghtx[xmax], wghty[ymax]
+            xwgt, ywgt = hsumy[xmax], hsumx[ymax]
             xsrt, ysrt = np.argsort(xwgt), np.argsort(ywgt)  # get array to sort by peaks
             # we want coordinates of the largest 2 peaks
             px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
             py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
             px, py = np.sort(px), np.sort(py)  # sort the coord from low to high
-
+    """
 #############
     chout = np.array([ [px[1], py[0]], [px[0], py[0]], [px[0], py[1]], [px[1], py[1]] ])
     medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
