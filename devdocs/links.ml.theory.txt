@@ -1,0 +1,50 @@
+Google's Machine Learning Crash Course:
+https://developers.google.com/machine-learning/crash-course/
+
+Machine Learning Glossary
+https://developers.google.com/machine-learning/glossary/#L1_regularization
+
+Standford - Lecture Collection | Convolutional Neural Networks for Visual Recognition (Spring 2017) 
+https://www.youtube.com/playlist?list=PL3FW7Lu3i5JvHM8ljYj-zLfQRF3EO8sYv
+
+topology, neural networks, deep learning, manifold hypothesis
+http://colah.github.io/posts/2014-03-NN-Manifolds-Topology/
+
+Introduction to Online Convex Optimization:
+http://ocobook.cs.princeton.edu/OCObook.pdf
+
+Competitive learning
+https://en.wikipedia.org/wiki/Competitive_learning
+
+Adaptive resonance theory - unsupervised learning methods
+https://en.wikipedia.org/wiki/Adaptive_resonance_theory
+
+Understanding LSTM Networks
+http://colah.github.io/posts/2015-08-Understanding-LSTMs/
+
+Selective Search for Object Recognition
+https://ivi.fnwi.uva.nl/isis/publications/2013/UijlingsIJCV2013/UijlingsIJCV2013.pdf
+
+R-CNN, Fast R-CNN, Faster R-CNN, YOLO — Object Detection Algorithms
+Understanding object detection algorithms
+https://towardsdatascience.com/r-cnn-fast-r-cnn-faster-r-cnn-yolo-object-detection-algorithms-36d53571365e
+
+Region Proposal Network (RPN) — Backbone of Faster R-CNN
+https://medium.com/@tanaykarmarkar/region-proposal-network-rpn-backbone-of-faster-r-cnn-4a744a38d7f9
+
+Faster R-CNN: Towards Real-Time Object
+Detection with Region Proposal Networks
+https://arxiv.org/pdf/1506.01497.pdf
+
+NVidia - LSTM
+https://developer.nvidia.com/discover/lstm
+
+25 Open Datasets for Deep Learning Every Data Scientist Must Work With
+https://www.analyticsvidhya.com/blog/2018/03/comprehensive-collection-deep-learning-datasets/
+
+Opencv - Haar Feature-based Cascade Classifier for Object Detection
+https://docs.opencv.org/2.4/modules/objdetect/doc/cascade_classification.html
+
+Empirical Analysis of Detection Cascades of Boosted Classifiers for Rapid Object Detection
+http://www.multimedia-computing.de/mediawiki//images/5/52/MRL-TR-May02-revised-Dec02.pdf
+

@@ -1,0 +1,77 @@
+
+NVidia - Forum
+https://devtalk.nvidia.com/
+
+A fairly complete explanation about DetectNet input and output layers
+https://github.com/NVIDIA/DIGITS/issues/1011
+
+DetectNet - NVidia
+https://devblogs.nvidia.com/detectnet-deep-neural-network-object-detection-digits/
+
+NVIDIA GPU Cloud (NGC)
+https://docs.nvidia.com/ngc/index.html
+
+NVidia - Stereo DNN TensorRT inference library
+https://github.com/NVIDIA-AI-IOT/redtail/tree/master/stereoDNN
+
+
+===========================================================================
+=========================      Jetson-Hardware    =========================
+Nvidia 
+Jetson TX2:
+ -Info: https://devblogs.nvidia.com/jetson-tx2-delivers-twice-intelligence-edge/
+ -Price: 400,-
+ -GPU: 256 Pascal Cores: 2x-Streams x 128 GPU
+ -CPU: Quad-Core: Cortex-A57 clustor 
+     + Dual-Core: Denver 2 ARM
+ -Memory: 8GB 128-bit 
+ -SSD: 32 GByte
+ -Camera: (2x) CSI-2 inputs
+ -Image Decoder: 2x-ISP-Streams @ 4Kp,60 FPS (Frames/sec)
+ -Image Clasifaction:
+   GoogleNet (batch=   2) 176 FPS
+   GoogleNet (batch=128)  253 FPS
+   AlexNet   (batch=128)  601 FPS
+ - OS: Linux For Tegra (L4T / Customized Ubuntu Linux)
+
+Jetson TX2:
+ -Info: https://devblogs.nvidia.com/nvidia-jetson-agx-xavier-32-teraops-ai-robotics/
+ -Price: xxx,-
+ -GPU: 512 Cuda Cores + 64 Tensor Cores
+    Organized as: 8x-'NVolta-Streams': x (64 GPU + 8 Tensor Cures + 128KB L1 cache)     
+    What are Tensor Cores? (Int|Float) matrix-multiply-and-accumulate units: M' = M1 x M2 + M3
+    https://devblogs.nvidia.com/programming-tensor-cores-cuda-9/
+ -CPU: 4 x Dual-core NVIDIA Carmel ARMv8.2 64-bit
+ -DLA: 2 x Deep Learning Accelerator Engines to offload processing a CNN layer
+ -Memory: 16GB 256-bit 
+ -SSD: 32 GByte
+ -Vision: 2 x VLIW (Vision Accelerator engines)
+ -Camera: up to 6 active sensor streams and 36 virtual channels
+        (16x) MIPI CSI-2 lanes
+    and  (8x) SLVS-EC lanes; 
+ -Image Decoder: (26 Streams) @ 1Kpixels,60 FPS (Frames/sec)
+        (2x) 8Kp30
+    or  (6x) 4Kp60
+    or (12x) 4Kp30
+    or (26x) 1080p60
+    or (52x) 1080p30
+ -Image Clasifaction:
+    8x the throughput of Jetson TX2 on VGG19 and 14x on ResNet-50
+   13x the performance in ResNet-18 FCN
+   ResNet-18 FCN (Fully Convolutional Network) for segmentation:
+              AGX vs TX2 images/s
+     Batch= 2  65      6
+     Batch=16  85      6       
+    More Benchmarks: https://developer.nvidia.com/embedded/jetson-agx-xavier-dl-inference-benchmarks
+ - OS: Linux For Tegra (L4T / Linux kernel 4.9)
+    or Ubuntu 18.04 LTS aarch64
+ 
+NVidia - Webinar take a deep dive into Jetson AGX
+https://info.nvidia.com/jetson-xavier-and-the-new-era-of-autonomous-machines-reg-page.html?nvid=nv-int-jncn-57921
+ 
+NVidia - Jetson AGX Xavier Forum
+https://devtalk.nvidia.com/default/board/326/
+ 
+NVidia - Links to Jetson Xavier Resources & Wiki 
+https://devtalk.nvidia.com/default/topic/1039020/jetson-agx-xavier/links-to-jetson-xavier-resources-amp-wiki/
+

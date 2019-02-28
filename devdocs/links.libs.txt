@@ -1,0 +1,99 @@
+===========================================================================
+							Software Libraries
+===========================================================================
+
+
+===========================================================================
+								Python
+===========================================================================
+Installing with Anaconda
+http://pandas.pydata.org/pandas-docs/stable/install.html#installing-pandas-with-anaconda
+
+NumPy's Structured Arrays
+https://jakevdp.github.io/PythonDataScienceHandbook/02.09-structured-data-numpy.html
+
+Pandas - Home
+http://pandas.pydata.org/
+
+Introducing Pandas Objects
+https://jakevdp.github.io/PythonDataScienceHandbook/03.01-introducing-pandas-objects.html
+
+scikit-learn:
+https://scikit-learn.org/stable/
+
+Cython:= C/Python Compiler for writing C extensions for Python.
+https://cython.org/
+
+
+
+===========================================================================
+								Google
+===========================================================================
+TensorFlow:
+https://www.tensorflow.org
+
+Colaboratory - Google
+https://colab.research.google.com/notebooks/welcome.ipynb
+
+Colaboratory – FAQ
+https://research.google.com/colaboratory/faq.html
+
+Goolge Collaboratory as a Data Science Learning Environment
+https://dlab.berkeley.edu/blog/google-collaboratory-data-science-learning-environment
+
+Google's Machine Learning Crash Course:
+https://developers.google.com/machine-learning/crash-course/
+https://colab.research.google.com/notebooks/mlcc/intro_to_neural_nets.ipynb?utm_source=mlcc&utm_campaign=colab-external&utm_medium=referral&utm_content=introneuralnets-colab&hl=en
+
+ML Practicum: Image Classification
+https://developers.google.com/machine-learning/practica/image-classification/
+
+Neural Networks: Programming Exercise
+https://developers.google.com/machine-learning/crash-course/introduction-to-neural-networks/programming-exercise
+
+Play with Neural Network in Browser !!
+http://playground.tensorflow.org/#activation=relu&regularization=L2&batchSize=10&dataset=circle&regDataset=reg-plane&learningRate=0.001&regularizationRate=0.01&noise=5&networkShape=&seed=0.91442&showTestData=false&discretize=false&percTrainData=50&x=true&y=true&xTimesY=false&xSquared=false&ySquared=false&cosX=false&sinX=true&cosY=false&sinY=true&collectStats=false&problem=classification&initZero=false&hideText=false
+
+TensorFlow example - Building the CNN MNIST Classifier
+https://www.tensorflow.org/tutorials/estimators/cnn
+
+TensorFlow Layers - MNist example
+https://tensorflow.rstudio.com/tfestimators/articles/layers.html
+
+Colaboratory – MNist example
+https://colab.research.google.com/notebooks/mlcc/multi-class_classification_of_handwritten_digits.ipynb?utm_source=mlcc&utm_campaign=colab-external&utm_medium=referral&utm_content=multiclass-colab&hl=en
+
+
+===========================================================================
+							OpemCv Build Tools
+===========================================================================
+OpenCv
+https://opencv.org/
+https://github.com/opencv/opencv
+
+OpenCv Installation:
+https://docs.opencv.org/master/d3/d52/tutorial_windows_install.html
+  git clone https://github.com/opencv/opencv.git
+
+Opencv - Haar Feature-based Cascade Classifier for Object Detection
+https://docs.opencv.org/2.4/modules/objdetect/doc/cascade_classification.html
+Ref: Empirical Analysis of Detection Cascades of Boosted Classifiers for Rapid Object Detection
+http://www.multimedia-computing.de/mediawiki//images/5/52/MRL-TR-May02-revised-Dec02.pdf
+
+Eigen - Matric Match Library
+http://eigen.tuxfamily.org/index.php?title=Main_Page
+
+Intel® Integrated Performance Primitives
+https://software.intel.com/en-us/intel-ipp
+
+CMAKE
+https://cmake.org/download/
+
+
+
+===========================================================================
+							Microsoft ML.NET
+===========================================================================
+ML.NET Content Guide
+https://docs.microsoft.com/en-us/dotnet/machine-learning/
+
