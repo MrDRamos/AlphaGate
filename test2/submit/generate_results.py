@@ -451,8 +451,9 @@ def get_edges(gray, img_name= None):
 
     # find the predominant blob
     filtsize = 5
-    hsumy, hsumx = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
+    hsumy, hsumx = np.sum(hst_01, axis=0), np.sum(hst_01, axis=1)
     hsumy, hsumx = maximum_filter1d(hsumy, size=filtsize), maximum_filter1d(hsumx, size=filtsize)
+    hsumx[0] = hsumy[0] = hsumx[hsumx.size - 1] = hsumy[hsumy.size - 1] = 0 # make sure the borders are included
     xmax = find_peaks(hsumy)[0]
     ymax = find_peaks(hsumx)[0]
 
@@ -466,41 +467,73 @@ def get_edges(gray, img_name= None):
     px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
     py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
     px, py = np.sort(px), np.sort(py)  # sort the coord from low to high
-    
+    # plt.imshow(hst_01), plt.show()
+
     # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
     span = hsumy[px[0]:px[1]]
     zeros = len([w for w in span if w == 0])
+    pr = px
+    psum = hsumy
     if max(0,span.size - filtsize) < 3 * zeros:
-        psum = hsumy
-        pm = xmax[xsrt[xsrt.size - 1]] #pm = xmax[xmax.size - 1]
-        p0 = pm - np.flip(psum[0:pm]).argmin(axis=0)
-        p1 = pm + psum[pm:psum.size].argmin(axis=0)
-        hst_01[:,:p0] = 0
-        hst_01[:,p1:] = 0
+        pc = xmax[xsrt[xsrt.size - 1]]  #pm = xmax[xmax.size - 1]        
+        pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
+        pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+    else:
+        if 0 == zeros:
+            pc = pr[0]
+            pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
+            pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+    hst_01[:,:pr[0]] = 0
+    hst_01[:, pr[1]:] = 0
+    # plt.imshow(hst_01), plt.show()
 
     # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
     span = hsumx[py[0]:py[1]]
     zeros = len([w for w in span if w == 0])
+    pr = py
+    psum = hsumx
     if max(0,span.size - filtsize) < 3 * zeros:
-        psum = hsumx
-        pm = ymax[ysrt[ysrt.size - 1]]  #ymax[ymax.size - 1]
-        p0 = pm - np.flip(psum[0:pm]).argmin(axis=0)
-        p1 = pm + psum[pm:psum.size].argmin(axis=0)
-        hst_01[:p0, :] = 0
-        hst_01[p1:, :] = 0
+        pc = ymax[ysrt[ysrt.size - 1]]  #ymax[ymax.size - 1]
+        pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
+        pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+    else:
+        if 0 == zeros:
+            pc = pr[1]
+            pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
+            pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+    hst_01[:pr[0], :] = 0
+    hst_01[pr[1]:, :] = 0
+    # plt.imshow(hst_01), plt.show()
 
     # Filter the selected edges based on the innew & outer edges of the final 2D hst
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
-    hsumy, hsumx = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
+    #hsumy, hsumx = np.sum(hst_01, axis=0), np.sum(hst_01, axis=1)
     hst_flt = np.multiply(hst_01, hst)
-    wsumy, wsumx = np.sum(hst_flt, axis=0), np.sum(hst_flt, axis=1)
+    wsumy0, wsumx0 = np.sum(hst_flt, axis=0), np.sum(hst_flt, axis=1)
+    wsumy, wsumx = maximum_filter1d(wsumy0, size=3), maximum_filter1d(wsumx0, size=3)
     
+    pxM, pyM = px, py  # Save px & py from blob analysis in case we have to meany peaks
+    dx, dy = px[1] - px[0], py[1] - py[0]
+    if dx < 20:
+        dist = 1
+    else:
+        dist = 4
     xmax = find_peaks(wsumy, distance=1)[0]
-#   if xmax.size < 2:
-        #TODO
+    if xmax.size < 2:
+        xmax = find_peaks(wsumy, distance=dist)[0]
+    if xmax.size < 4:
+        pxM = None
+
+    if dy < 20:
+        dist = 2
+    else:
+        dist = 6
     ymax = find_peaks(wsumx, distance=2)[0]
-#   if ymax.size < 2:
-        #TODO
+    if ymax.size < 2:
+        ymax = find_peaks(wsumx0, distance=dist)[0]
+    if ymax.size < 4:
+        pyM = None
+
     #psumy, psumx = hsumy[xmax], hsumx[ymax]  # get the corresponding peak values
     psumy, psumx = wsumy[xmax], wsumx[ymax]  # get the corresponding peak values
     xsrt, ysrt = np.argsort(psumy), np.argsort(psumx)  # get array to sort by peaks
@@ -508,7 +541,11 @@ def get_edges(gray, img_name= None):
     px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
     py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
     px, py = np.sort(px), np.sort(py) # sort the coord from low to high
-
+    # plt.imshow(hst_01), plt.show()
+    if not pxM is None:
+        px = pxM
+    if not pyM is None:
+        py = pyM
 ################# 
     """
     wghtrng = hsumy[px[0]:px[1]]
