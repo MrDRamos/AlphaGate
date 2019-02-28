@@ -11,7 +11,7 @@ import time
 import os
 
 #image_dir = 'testing/images/'
-image_dir = '../../../Data_Training/'
+image_dir = '../Data_Training/'
 
 img_file = glob.glob(image_dir + '*.JPG')
 img_keys = [img_i.split(os.sep)[-1] for img_i in img_file]
