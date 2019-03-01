@@ -524,13 +524,13 @@ def get_edges(gray, img_name= None):
         py = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
 
     px, py = np.sort(px), np.sort(py) # sort the coord from low to high
-    chout = np.array([ [px[1], py[0]], [px[0], py[0]], [px[0], py[1]], [px[1], py[1]] ])
+    chout = np.array([ [px[0], py[0]], [px[1], py[0]], [px[1], py[1]], [px[0], py[1]] ])
     medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
     cx, cy = medx * pixelsPerBin, medy * pixelsPerBin
     cout = (chout + 0.5) * pixelsPerBin
 
-    ##xx    if False:
-    if True:
+    if False:
+    ##xx    if True:
         fig, axS = plt.subplots(1,2)
         ax = axS.ravel()
         #ax[0].plot([avgx], [avgy], marker='o', markersize=5, color="yellow")
@@ -597,8 +597,8 @@ def my_prediction(img, img_name= None):
     ### within the inner & outer box ROI's found by get_edges()
     ####### TODO #######
 
-##xx    dbg_show = True
-    dbg_show = False
+    dbg_show = True
+##xx    dbg_show = False
     if dbg_show:
         plt.plot([cx], [cy], marker='+', markersize=15, color="red")
         pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
