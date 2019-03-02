@@ -449,24 +449,87 @@ def get_edges(gray, img_name= None):
 
 
 
-    # Filter the selected edges based on the innew & outer edges of the final 2D hst
-    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
-    wghtx, wghty = np.sum(hst_01, axis=0).astype(np.single), np.sum(hst_01, axis=1).astype(np.single)
-    xmax = find_peaks(wghtx, distance=3)[0]
-    ymax = find_peaks(wghty, distance=6)[0]
-    xwgt, ywgt = wghtx[xmax], wghty[ymax] # get the corresponding peak values
-    xsrt, ysrt = np.argsort(xwgt), np.argsort(ywgt)  # get array to sort by peaks
+    # find the predominant blob
+    filtsize = 5
+    hsumy, hsumx = np.sum(hst_01, axis=0), np.sum(hst_01, axis=1)
+    hsumy, hsumx = maximum_filter1d(hsumy, size=filtsize), maximum_filter1d(hsumx, size=filtsize)
+    hsumx[0] = hsumy[0] = hsumx[hsumx.size - 1] = hsumy[hsumy.size - 1] = 0 # make sure the borders are included
+    xmax = find_peaks(hsumy)[0]
+    ymax = find_peaks(hsumx)[0]
+
+    # Sanity check in case the image has no blobs
+    if 0 == xmax.size or 0 == ymax.size:
+        return np.array([[],[]]), (0,0)
+
+    psumy, psumx = hsumy[xmax], hsumx[ymax]  # get the corresponding peak values
+    xsrt, ysrt = np.argsort(psumy), np.argsort(psumx)  # get array to sort by peaks
     # we want coordinates of the largest 2 peaks
     px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
     py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
-    px, py = np.sort(px), np.sort(py) # sort the coord from low to high
+    px, py = np.sort(px), np.sort(py)  # sort the coord from low to high
+    # plt.imshow(hst_01), plt.show()
 
-    chout = np.array([ [px[1], py[0]], [px[0], py[0]], [px[0], py[1]], [px[1], py[1]] ])
+    # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
+    span = hsumy[px[0]:px[1]]
+    zeros = len([w for w in span if w == 0])
+    pr = px
+    psum = hsumy
+    if max(0,span.size - filtsize) < 3 * zeros:
+        pc = xmax[xsrt[xsrt.size - 1]]  #pm = xmax[xmax.size - 1]        
+        pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
+        pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+    else:
+        if 0 == zeros:
+            pc = pr[0]
+            pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
+            pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+    hst_01[:,:pr[0]] = 0
+    hst_01[:, pr[1]:] = 0
+    # plt.imshow(hst_01), plt.show()
+
+    # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
+    span = hsumx[py[0]:py[1]]
+    zeros = len([w for w in span if w == 0])
+    pr = py
+    psum = hsumx
+    if max(0,span.size - filtsize) < 3 * zeros:
+        pc = ymax[ysrt[ysrt.size - 1]]  #ymax[ymax.size - 1]
+        pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
+        pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+    else:
+        if 0 == zeros:
+            pc = pr[1]
+            pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
+            pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+    hst_01[:pr[0], :] = 0
+    hst_01[pr[1]:, :] = 0
+    # plt.imshow(hst_01), plt.show()
+
+
+
+
+    # Filter the selected edges based on the innew & outer edges of the final 2D hst
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
+    hst_flt = np.multiply(hst_01, hst)
+    wsumy, wsumx = np.sum(hst_flt, axis=0), np.sum(hst_flt, axis=1)
+
+    peaks = find_peaks(wsumy, prominence=1)
+    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
+    if 1 < pmax.size:
+        px = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+
+    peaks = find_peaks(wsumx, prominence=1)
+    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
+    if 1 < pmax.size:
+        py = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+
+    px, py = np.sort(px), np.sort(py) # sort the coord from low to high
+    chout = np.array([ [px[0], py[0]], [px[1], py[0]], [px[1], py[1]], [px[0], py[1]] ])
     medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
     cx, cy = medx * pixelsPerBin, medy * pixelsPerBin
     cout = (chout + 0.5) * pixelsPerBin
 
-    ##xx    if False:
+    ##xxif False:
     if True:
         fig, axS = plt.subplots(1,2)
         ax = axS.ravel()
@@ -481,7 +544,29 @@ def get_edges(gray, img_name= None):
         ax[1].plot(pxout, pyout, color="red", linewidth=1)
         ax[1].imshow(gray, 'gray'), ax[1].set_title(img_name)
         plt.show()
-  
+
+        fig, axS = plt.subplots(2,2)
+        ax = axS.ravel()
+        ax[0].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[0].plot(pxout, pyout, color="red", linewidth=1)
+        ax[0].imshow(img_dxNeg, 'gray'), ax[0].set_title("Sobel-dX < 0 "+ img_name)
+
+        ax[1].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[1].plot(pxout, pyout, color="red", linewidth=1)
+        ax[1].imshow(img_dxPos, 'gray'), ax[1].set_title("0 < Sobel-dX "+ img_name)
+
+        ax[2].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[2].plot(pxout, pyout, color="red", linewidth=1)
+        ax[2].imshow(img_dyNeg, 'gray'), ax[2].set_title("Sobel-dY < 0 "+ img_name)
+
+        ax[3].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[3].plot(pxout, pyout, color="red", linewidth=1)
+        ax[3].imshow(img_dyPos, 'gray'), ax[3].set_title("0 < Sobel-dY "+ img_name)
+        plt.show()
     return cout, (cx, cy)
 
 
@@ -554,8 +639,9 @@ class GenerateFinalDetections():
     def predict(self, img, img_name ="na"):
         edges = my_prediction(img, img_name)
         if edges is None:
-            bb_all = np.array([])
+            bb_all = []
         else:
-            bb_all = np.append(edges, .5)
+            # We could have more than 1 bb ..
+            bb_all = np.array([np.append(edges, .5)])
         return bb_all.tolist()
-        
+

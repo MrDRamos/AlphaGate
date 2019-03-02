@@ -1,6 +1,7 @@
 <#
   Copy this file your conda installation directory: <CONDA_PREFIX>\Scripts
   dot-source this file - to use the conda commands exportd by this powwershell script.
+  see: https://github.com/conda/conda/issues/626
 #>
 
 

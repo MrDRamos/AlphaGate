@@ -1,0 +1,18 @@
+numpy
+scipy
+matplotlib
+opencv-python
+
+######### Windows Python 2.5.2 using anaconda #########
+#numpy==1.16.2
+#scipy==1.2.1
+#matplotlib==3.0.1
+#opencv-python==3.4.5.20
+
+######### Windows Python 2.5.2 using  PIP #########
+# Note: Pip modules are installed in: C:\Users\USERNAME\AppData\Roaming\Python
+#numpy==1.16.2
+#scipy==1.2.1
+#matplotlib==3.0.2
+#opencv-python==4.0.0.21
+
