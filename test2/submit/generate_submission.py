@@ -14,8 +14,9 @@ import os
 # python test2/submit/generate_submission.py
 script_path = os.path.dirname(os.path.realpath(__file__))
 image_dir = script_path + '/../../../Data_Training/'
-#image_dir = script_path + '/../../../Data_LeaderboardTesting/'
+image_dir = script_path + '/../../../Data_LeaderboardTesting/'
 ResultFilename = script_path + "/airvision_submission.json"
+#ResultFilename = script_path + "/random_submission.json"
 
 img_file = glob.glob(image_dir + '*.JPG')
 img_keys = [img_i.split(os.sep)[-1] for img_i in img_file]
@@ -35,14 +36,18 @@ def UseTrainingImages(qty=20):
     #data_ofs = img_keys.index('IMG_1625.JPG') # no gate, 492, 5199
     img_keys = img_keys[data_ofs: data_ofs + qty]
 
-UseTrainingImages()
+#UseTrainingImages()
 
 # Instantiate a new detector
 finalDetector = GenerateFinalDetections()
 # load image, convert to RGB, run model and plot detections. 
 time_all = []
 pred_dict = {}
+n = len(img_keys)
+i = 0
 for img_key in img_keys:
+    i += 1
+    print("{0} {1:4d}/{2}".format(img_key, i, n))
     img =cv2.imread(image_dir + img_key)
     img =cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     tic = time.monotonic()
