@@ -220,46 +220,8 @@ def edge_hist(edges, img, bin_dx, bin_dy = None):
     return hist, xbins, ybins
 
 
-def get_edges(gray, img_name= None):
-    # Extract edge features
-    maxCorners  = 250 #128  at lead 40/corner + Top/Btm AIRR Lables + some outliers which we will have to filter
-    ksize = 3   # kernal size
-    Use_PosNeg_Gradiant_Splitting = False # Tradeoff feature quantity vs speed - 100 ms
-    Use_PosNeg_Gradiant_Splitting = True  # Tradeoff feature quantity vs speed  - 300 ms
-    if Use_PosNeg_Gradiant_Splitting:
-        # Split the sobel results into Pos,|Neg| features -> Yields More information -> more edges (28 ms- 14 ms/call)
-        img_dxNeg, img_dxPos = Sobel_SplitPosNeg(gray, Horizontal=True, ksize=ksize, UseScharr= False)
-        img_dyNeg, img_dyPos = Sobel_SplitPosNeg(gray, Horizontal=False, ksize=ksize, UseScharr= False)
-
-        # (200 ms - 50 ms/img)
-        edge_xNeg = get_corners_xy(img_dxNeg, maxCorners)
-        edge_xPos = get_corners_xy(img_dxPos, maxCorners)
-        edge_yNeg = get_corners_xy(img_dyNeg, maxCorners)
-        edge_yPos = get_corners_xy(img_dyPos, maxCorners)
-
-        # Merge the edges from the Pos,|Neg| sobel channels
-        edge_x = np.append(edge_xNeg, edge_xPos, 0)
-        edge_y = np.append(edge_yNeg, edge_yPos, 0)
-
-    else:  # Faster  sobel without splitting - Result: Dont get as many edges as with splitting
-        # (16 ms - 8 ms/img)
-        img_dx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=ksize)
-        img_dy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=ksize)
-        # (100 ms - 50 ms/img)
-        edge_x = get_corners_xy(img_dx, maxCorners)
-        edge_y = get_corners_xy(img_dy, maxCorners)
-    #show_edges(gray, edge_x, edge_y)
-    ##xx show_edges(gray, edge_x, edge_y, clusters=10)
-
-    # Conbine X & Y edges
-    edgeS = np.append(edge_x, edge_yNeg, 0)
-    edgeN = edgeS.shape[0]
-
-    #### 2D Edge0-Feature Histogram #####
-    pixelsPerBin = 20 #15 # 100 # 15 for small gate
-    hst, hstx, hsty = edge_hist(edgeS, gray, pixelsPerBin)
-    hst = hst.astype(np.uint8)
-    
+def hst_filter(hst, img_name= None):
+    # removes small unconnected bins from the histogram
     ########## Histogtam blob Filters ##########
     # https://docs.opencv.org/2.4/modules/imgproc/doc/filtering.html?highlight=cv2.filter2d#cv2.filter2D
     #cv2.namedWindow("full", cv2.WINDOW_NORMAL)
@@ -445,15 +407,62 @@ def get_edges(gray, img_name= None):
 ##xx  plt.subplot(1,3,1), plt.imshow(hst_flt), plt.subplot(1,3,2), plt.imshow(hst), plt.subplot(1,3,3), plt.imshow(gray, 'gray'), plt.show()
     hst = hst_flt[2:-2, 2:-2]
     hst_01 = hst_01[2:-2,2:-2]
+    return hst, hst_01
     ########## Histogtam blob Filters ##########
 
+    
+
+def get_edges(gray, img_name= None):
+    # Extract edge features
+    maxCorners  = 250 #128  at lead 40/corner + Top/Btm AIRR Lables + some outliers which we will have to filter
+    ksize = 3   # kernal size
+    Use_PosNeg_Gradiant_Splitting = False # Tradeoff feature quantity vs speed - 100 ms
+    Use_PosNeg_Gradiant_Splitting = True  # Tradeoff feature quantity vs speed  - 300 ms
+    if Use_PosNeg_Gradiant_Splitting:
+        # Split the sobel results into Pos,|Neg| features -> Yields More information -> more edges (28 ms- 14 ms/call)
+        img_dxNeg, img_dxPos = Sobel_SplitPosNeg(gray, Horizontal=True, ksize=ksize, UseScharr= False)
+        img_dyNeg, img_dyPos = Sobel_SplitPosNeg(gray, Horizontal=False, ksize=ksize, UseScharr= False)
+
+        # (200 ms - 50 ms/img)
+        edge_xNeg = get_corners_xy(img_dxNeg, maxCorners)
+        edge_xPos = get_corners_xy(img_dxPos, maxCorners)
+        edge_yNeg = get_corners_xy(img_dyNeg, maxCorners)
+        edge_yPos = get_corners_xy(img_dyPos, maxCorners)
+
+        # Merge the edges from the Pos,|Neg| sobel channels
+        edge_x = np.append(edge_xNeg, edge_xPos, 0)
+        edge_y = np.append(edge_yNeg, edge_yPos, 0)
+
+    else:  # Faster  sobel without splitting - Result: Dont get as many edges as with splitting
+        # (16 ms - 8 ms/img)
+        img_dx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=ksize)
+        img_dy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=ksize)
+        # (100 ms - 50 ms/img)
+        edge_x = get_corners_xy(img_dx, maxCorners)
+        edge_y = get_corners_xy(img_dy, maxCorners)
+    #show_edges(gray, edge_x, edge_y)
+    ##xx show_edges(gray, edge_x, edge_y, clusters=10)
+
+    # Conbine X & Y edges
+    edgeS = np.append(edge_x, edge_y, 0)
+    edgeN = edgeS.shape[0]
+
+    #### 2D Edge0-Feature Histogram #####
+    pixelsPerBin = 20 #15 # 100 # 15 for small gate
+    hst, hstx, hsty = edge_hist(edgeS, gray, pixelsPerBin)
+    hst = hst.astype(np.uint8)
+    
+    #### Remove small unconnected bins from the histogram ####
+    hst, hst_01 = hst_filter(hst)
 
 
-    # find the predominant blob
+    #### find the predominant blob ####
     filtsize = 5
     hsumy, hsumx = np.sum(hst_01, axis=0), np.sum(hst_01, axis=1)
+    # plt.plot(hsumy), plt.plot(hsumx), plt.show()
     hsumy, hsumx = maximum_filter1d(hsumy, size=filtsize), maximum_filter1d(hsumx, size=filtsize)
     hsumx[0] = hsumy[0] = hsumx[hsumx.size - 1] = hsumy[hsumy.size - 1] = 0 # make sure the borders are included
+    # plt.plot(hsumy), plt.plot(hsumx), plt.show()
     xmax = find_peaks(hsumy)[0]
     ymax = find_peaks(hsumx)[0]
 
@@ -506,8 +515,6 @@ def get_edges(gray, img_name= None):
     # plt.imshow(hst_01), plt.show()
 
 
-
-
     # Filter the selected edges based on the innew & outer edges of the final 2D hst
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
     hst_flt = np.multiply(hst_01, hst)
@@ -529,6 +536,7 @@ def get_edges(gray, img_name= None):
     cx, cy = medx * pixelsPerBin, medy * pixelsPerBin
     cout = (chout + 0.5) * pixelsPerBin
 
+
     if False:
 ##xx    if True:
         fig, axS = plt.subplots(1,2)
@@ -545,35 +553,7 @@ def get_edges(gray, img_name= None):
         ax[1].imshow(gray, 'gray'), ax[1].set_title(img_name)
         plt.show()
 
-    if True:
-        fig, axS = plt.subplots(2,3)
-        ax = axS.ravel()
-        ax[0].plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        ax[0].plot(pxout, pyout, color="red", linewidth=1)
-        ax[0].imshow(img_dxNeg, 'gray'), ax[0].set_title("-dX Sobel "+ img_name)
-
-        ax[1].plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        ax[1].plot(pxout, pyout, color="red", linewidth=1)
-        ax[1].imshow(img_dxPos, 'gray'), ax[1].set_title("+dX Sobel "+ img_name)
-
-        ax[2].plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        ax[2].plot(pxout, pyout, color="red", linewidth=1)
-        ax[2].imshow(gray, 'gray'), ax[2].set_title(img_name)
-
-        ax[3].plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        ax[3].plot(pxout, pyout, color="red", linewidth=1)
-        ax[3].imshow(img_dyNeg, 'gray'), ax[3].set_title("-dY Sobel "+ img_name)
-
-        ax[4].plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        ax[4].plot(pxout, pyout, color="red", linewidth=1)
-        ax[4].imshow(img_dyPos, 'gray'), ax[4].set_title("+dY Sobel "+ img_name)
-        plt.show()
-    return cout, (cx, cy)
+    return cout, (cx, cy), (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
 
 
 
@@ -618,11 +598,40 @@ def my_prediction(img, img_name= None):
         #gray = scale_intensity(gray, 255 / (255 - 20), dst=gray)
         #plt.imshow(gray, 'gray'), plt.title("gray - Preprocessed- Clip Max"), plt.show()
 
-    cout, (cx, cy) = get_edges(gray, img_name)
+    cout, (cx, cy), (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos) = get_edges(gray, img_name)
+    if False:
+#    if True:
+        fig, axS = plt.subplots(2,3)
+        ax = axS.ravel()
+        ax[0].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[0].plot(pxout, pyout, color="red", linewidth=1)
+        ax[0].imshow(img_dxNeg, 'gray'), ax[0].set_title("-dX Sobel "+ img_name)
+
+        ax[1].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[1].plot(pxout, pyout, color="red", linewidth=1)
+        ax[1].imshow(img_dxPos, 'gray'), ax[1].set_title("+dX Sobel "+ img_name)
+
+        ax[2].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[2].plot(pxout, pyout, color="red", linewidth=1)
+        ax[2].imshow(gray, 'gray'), ax[2].set_title(img_name)
+
+        ax[3].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[3].plot(pxout, pyout, color="red", linewidth=1)
+        ax[3].imshow(img_dyNeg, 'gray'), ax[3].set_title("-dY Sobel "+ img_name)
+
+        ax[4].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[4].plot(pxout, pyout, color="red", linewidth=1)
+        ax[4].imshow(img_dyPos, 'gray'), ax[4].set_title("+dY Sobel "+ img_name)
+        plt.show()
 
     ####### TODO #######
-    ### Find the exact gate corner positions by analyzing the image 
-    ### within the inner & outer box ROI's found by get_edges()
+    ### Find the exact gate corner positions by analyzing the sobel'd image
+    
     ####### TODO #######
 
 ##xx    dbg_show = True
