@@ -24,6 +24,8 @@ https://scikit-learn.org/stable/
 Cython:= C/Python Compiler for writing C extensions for Python.
 https://cython.org/
 
+YOLO Object Detection with OpenCV and Python
+https://www.arunponnusamy.com/yolo-object-detection-opencv-python.html
 
 
 ===========================================================================
@@ -90,6 +92,22 @@ CMAKE
 https://cmake.org/download/
 
 
+
+OpenCv4
+https://opencv.org/opencv-4-0-0.html
+
+OpenCV FAST feature detector with Python example:
+https://docs.opencv.org/4.0.0/df/d0c/tutorial_py_fast.html
+
+LineSegmentDetector in Opencv 3 with Python
+https://stackoverflow.com/questions/41329665/linesegmentdetector-in-opencv-3-with-python
+
+Harris Corner Detector in OpenCV
+https://docs.opencv.org/4.0.0/dc/d0d/tutorial_py_features_harris.html
+
+Step By Step installation of OpenCV with GPU support
+https://www.pyimagesearch.com/2017/09/27/setting-up-ubuntu-16-04-cuda-gpu-for-deep-learning-with-python/
+		
 
 ===========================================================================
 							Microsoft ML.NET

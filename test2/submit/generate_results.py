@@ -524,13 +524,13 @@ def get_edges(gray, img_name= None):
         py = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
 
     px, py = np.sort(px), np.sort(py) # sort the coord from low to high
-    chout = np.array([ [px[1], py[0]], [px[0], py[0]], [px[0], py[1]], [px[1], py[1]] ])
+    chout = np.array([ [px[0], py[0]], [px[1], py[0]], [px[1], py[1]], [px[0], py[1]] ])
     medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
     cx, cy = medx * pixelsPerBin, medy * pixelsPerBin
     cout = (chout + 0.5) * pixelsPerBin
 
-    ##xx    if False:
-    if True:
+    if False:
+##xx    if True:
         fig, axS = plt.subplots(1,2)
         ax = axS.ravel()
         #ax[0].plot([avgx], [avgy], marker='o', markersize=5, color="yellow")
@@ -544,7 +544,35 @@ def get_edges(gray, img_name= None):
         ax[1].plot(pxout, pyout, color="red", linewidth=1)
         ax[1].imshow(gray, 'gray'), ax[1].set_title(img_name)
         plt.show()
-  
+
+    if True:
+        fig, axS = plt.subplots(2,3)
+        ax = axS.ravel()
+        ax[0].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[0].plot(pxout, pyout, color="red", linewidth=1)
+        ax[0].imshow(img_dxNeg, 'gray'), ax[0].set_title("-dX Sobel "+ img_name)
+
+        ax[1].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[1].plot(pxout, pyout, color="red", linewidth=1)
+        ax[1].imshow(img_dxPos, 'gray'), ax[1].set_title("+dX Sobel "+ img_name)
+
+        ax[2].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[2].plot(pxout, pyout, color="red", linewidth=1)
+        ax[2].imshow(gray, 'gray'), ax[2].set_title(img_name)
+
+        ax[3].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[3].plot(pxout, pyout, color="red", linewidth=1)
+        ax[3].imshow(img_dyNeg, 'gray'), ax[3].set_title("-dY Sobel "+ img_name)
+
+        ax[4].plot([cx], [cy], marker='+', markersize=15, color="red")
+        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
+        ax[4].plot(pxout, pyout, color="red", linewidth=1)
+        ax[4].imshow(img_dyPos, 'gray'), ax[4].set_title("+dY Sobel "+ img_name)
+        plt.show()
     return cout, (cx, cy)
 
 
@@ -617,8 +645,9 @@ class GenerateFinalDetections():
     def predict(self, img, img_name ="na"):
         edges = my_prediction(img, img_name)
         if edges is None:
-            bb_all = np.array([])
+            bb_all = []
         else:
-            bb_all = np.append(edges, .5)
+            # We could have more than 1 bb ..
+            bb_all = np.array([np.append(edges, .5)])
         return bb_all.tolist()
-        
+
