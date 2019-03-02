@@ -531,14 +531,16 @@ def get_edges(gray, img_name= None):
         py = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
 
     px, py = np.sort(px), np.sort(py) # sort the coord from low to high
-    chout = np.array([ [px[0], py[0]], [px[1], py[0]], [px[1], py[1]], [px[0], py[1]] ])
     medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
     cx, cy = medx * pixelsPerBin, medy * pixelsPerBin
-    cout = (chout + 0.5) * pixelsPerBin
+    bx, by = np.int32((px + 0.5) * pixelsPerBin), np.int32((py + 0.5) * pixelsPerBin)
 
 
     if False:
 ##xx    if True:
+        chout = np.array([ [px[0], py[0]], [px[1], py[0]], [px[1], py[1]], [px[0], py[1]] ])
+        cout = (chout + 0.5) * pixelsPerBin
+
         fig, axS = plt.subplots(1,2)
         ax = axS.ravel()
         #ax[0].plot([avgx], [avgy], marker='o', markersize=5, color="yellow")
@@ -553,7 +555,7 @@ def get_edges(gray, img_name= None):
         ax[1].imshow(gray, 'gray'), ax[1].set_title(img_name)
         plt.show()
 
-    return cout, (cx, cy), (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
+    return bx, by, (cx, cy), (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
 
 
 
@@ -598,9 +600,11 @@ def my_prediction(img, img_name= None):
         #gray = scale_intensity(gray, 255 / (255 - 20), dst=gray)
         #plt.imshow(gray, 'gray'), plt.title("gray - Preprocessed- Clip Max"), plt.show()
 
-    cout, (cx, cy), (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos) = get_edges(gray, img_name)
+    bx, by, (cx, cy), (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos) = get_edges(gray, img_name)
     if False:
 #    if True:
+        cout = np.array([ [bx[0], by[0]], [bx[1], by[0]], [bx[1], by[1]], [bx[0], by[1]] ])
+
         fig, axS = plt.subplots(2,3)
         ax = axS.ravel()
         ax[0].plot([cx], [cy], marker='+', markersize=15, color="red")
@@ -631,7 +635,30 @@ def my_prediction(img, img_name= None):
 
     ####### TODO #######
     ### Find the exact gate corner positions by analyzing the sobel'd image
-    
+    #hst_bb = gray[by[0]:by[1], bx[0]:bx[1]]
+    hst_bb = gray[by[0]:by[1], bx[0]:bx[1]]
+    sumy, sumx = np.sum(hst_bb, axis=0), np.sum(hst_bb, axis=1)
+    # plt.subplot(1,3,1), plt.plot(sumy), plt.subplot(1,3,2), plt.plot(sumx), plt.subplot(1,3,3), plt.imshow(hst_bb),  plt.show() 
+
+    peaks = find_peaks(sumy, prominence=1)
+    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
+    if 1 < pmax.size:
+        px = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+
+    peaks = find_peaks(sumx, prominence=1)
+    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
+    if 1 < pmax.size:
+        py = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+
+    px, py = np.sort(px), np.sort(py) # sort the coord from low to high
+#    if False:
+    if True:
+        pltx = np.array([px[0], px[1], px[1], px[0], px[0]])
+        plty = np.array([py[0], py[0], py[1], py[1], py[0]])
+        plt.plot(pltx, plty, color="red", linewidth=1)
+        plt.imshow(hst_bb, 'gray'), plt.title(img_name), plt.show()
+
+    bx, by = px + by[0] , py + by[0]
     ####### TODO #######
 
 ##xx    dbg_show = True
@@ -642,7 +669,9 @@ def my_prediction(img, img_name= None):
         plt.plot(pxout, pyout, color="red", linewidth=3)
         plt.imshow(gray, 'gray'), plt.title(img_name)
         plt.show()
-    return cout
+
+    bb = np.array([ [bx[0], by[0]], [bx[1], by[0]], [bx[1], by[1]], [bx[0], by[1]] ])
+    return bb
 
 
 class GenerateFinalDetections():
@@ -652,11 +681,11 @@ class GenerateFinalDetections():
         self.seed = 2018
         
     def predict(self, img, img_name ="na"):
-        edges = my_prediction(img, img_name)
-        if edges is None:
+        bb = my_prediction(img, img_name)
+        if bb is None:
             bb_all = []
         else:
             # We could have more than 1 bb ..
-            bb_all = np.array([np.append(edges, .5)])
+            bb_all = np.array([np.append(bb, .5)])
         return bb_all.tolist()
 
