@@ -597,8 +597,8 @@ def my_prediction(img, img_name= None):
     ### within the inner & outer box ROI's found by get_edges()
     ####### TODO #######
 
-    dbg_show = True
-##xx    dbg_show = False
+##xx    dbg_show = True
+    dbg_show = False
     if dbg_show:
         plt.plot([cx], [cy], marker='+', markersize=15, color="red")
         pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
@@ -617,8 +617,9 @@ class GenerateFinalDetections():
     def predict(self, img, img_name ="na"):
         edges = my_prediction(img, img_name)
         if edges is None:
-            bb_all = np.array([])
+            bb_all = []
         else:
-            bb_all = np.append(edges, .5)
+            # We could have more than 1 bb ..
+            bb_all = np.array([np.append(edges, .5)])
         return bb_all.tolist()
-        
+
