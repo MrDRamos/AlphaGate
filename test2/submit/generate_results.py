@@ -41,7 +41,7 @@ def SplitFloat_NegPosU8(SrcArray):
     return neg_U8, pos_U8 
 
 
-def Sobel_SplitPosNeg(img, Horizontal=True, ksize=3, UseScharr= False):
+def Sobel_SplitPosNeg(img, Horizontal=True, ksize=3, UseScharr= False, UseSorbel= False, UseRoberts= False):
     dtype = cv2.CV_16S
     #dtype = cv2.CV_32F
     # https://docs.opencv.org/2.4/modules/imgproc/doc/filtering.html?highlight=sobel#cv2.Sobel
@@ -50,18 +50,28 @@ def Sobel_SplitPosNeg(img, Horizontal=True, ksize=3, UseScharr= False):
             img_grad = cv2.Scharr(img, dtype, 1, 0)
         else:
             img_grad = cv2.Scharr(img, dtype, 0, 1)
-    else:
+    elif UseSorbel:
         if Horizontal:
             img_grad = cv2.Sobel(img, dtype, 1, 0, ksize= ksize)
         else:
             img_grad = cv2.Sobel(img, dtype, 0, 1, ksize= ksize)
+    elif UseRoberts:
+        if Horizontal:
+            roberst_h = np.array( [[0, 1],
+                                   [-1, 0]])
+            img_grad = cv2.filter2D(img, -1, roberst_h)     
+        else:
+            roberst_v = np.array( [[1, 0],
+                                   [0,-1]])
+            img_grad = cv2.filter2D(img, -1, roberst_v)
+        
     if (dtype == cv2.CV_16S):
         neg_grad, pos_grad = SplitFloat_NegPosU8(img_grad)
     else:
         neg_grad, pos_grad = SplitAbs_NegPos(img_grad)
 
-    dbg_show = False
-#    dbg_show = True
+#    dbg_show = False
+    dbg_show = True
     if dbg_show:
         fstat = cv2.minMaxLoc(img_grad); print(fstat)
         nstat = cv2.minMaxLoc(neg_grad); print(nstat)
@@ -105,8 +115,8 @@ def get_corners_xy(img, maxCorners=128):
     blockSize = 3      # Default =3, Size of an average block for computing a derivative covariation matrix over each pixel neighborhood
     CornerS = cv2.goodFeaturesToTrack(img, maxCorners, qualityLevel, minDistance, blockSize = blockSize)
 
-    dbg_show = False
-#    dbg_show = True
+#    dbg_show = False
+    dbg_show = True
     if dbg_show:
         img_abs = convert2absU8(img)
         img_rgb = cv2.cvtColor(img_abs, cv2.COLOR_GRAY2RGB)
@@ -228,8 +238,14 @@ def get_edges(gray, img_name= None):
     Use_PosNeg_Gradiant_Splitting = True  # Tradeoff feature quantity vs speed  - 300 ms
     if Use_PosNeg_Gradiant_Splitting:
         # Split the sobel results into Pos,|Neg| features -> Yields More information -> more edges (28 ms- 14 ms/call)
-        img_dxNeg, img_dxPos = Sobel_SplitPosNeg(gray, Horizontal=True, ksize=ksize, UseScharr= False)
-        img_dyNeg, img_dyPos = Sobel_SplitPosNeg(gray, Horizontal=False, ksize=ksize, UseScharr= False)
+        ksize=3
+        img_dxNeg, img_dxPos = Sobel_SplitPosNeg(gray, Horizontal=True, ksize=ksize, UseScharr= False, UseSorbel= True, UseRoberts= False)
+        img_dyNeg, img_dyPos = Sobel_SplitPosNeg(gray, Horizontal=False, ksize=ksize, UseScharr= False, UseSorbel= True, UseRoberts= False)
+        ksize=2
+        img_dxNeg, img_dxPos = Sobel_SplitPosNeg(gray, Horizontal=True,  ksize=ksize, UseScharr= False, UseSorbel= False, UseRoberts= True)
+        img_dyNeg, img_dyPos = Sobel_SplitPosNeg(gray, Horizontal=False, ksize=ksize, UseScharr= False, UseSorbel= False, UseRoberts= True)
+
+                                      
 
         # (200 ms - 50 ms/img)
         edge_xNeg = get_corners_xy(img_dxNeg, maxCorners)

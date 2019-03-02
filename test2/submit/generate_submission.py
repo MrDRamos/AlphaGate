@@ -55,7 +55,7 @@ for img_key in img_keys:
     toc = time.monotonic()
     pred_dict[img_key] = bb_all
     time_all.append(toc-tic)
-
+    
 mean_time = np.mean(time_all)
 ci_time = 1.96*np.std(time_all)
 freq = np.round(1/mean_time,2)
