@@ -36,7 +36,7 @@ def SplitFloat_NegPosU8(SrcArray):
     tmp = cv2.scaleAdd(SrcArray, 255.4999/MaxFloat -1, SrcArray)
     pos_U8 = np.uint8(tmp.clip(min=0))
 
-    tmp.clip(max=0, out=tmp)
+    #tmp.clip(max=0, out=tmp)
     neg_U8 = np.uint8(np.abs(tmp, out= tmp))
     return neg_U8, pos_U8 
 
@@ -57,12 +57,12 @@ def Sobel_SplitPosNeg(img, Horizontal=True, ksize=3, UseScharr= False, UseSorbel
             img_grad = cv2.Sobel(img, dtype, 0, 1, ksize= ksize)
     elif UseRoberts:
         if Horizontal:
-            roberst_h = np.array( [[0, 1],
-                                   [-1, 0]])
+            roberst_h = np.array( [[0, 2],
+                                   [-2, 0]])
             img_grad = cv2.filter2D(img, -1, roberst_h)     
         else:
-            roberst_v = np.array( [[1, 0],
-                                   [0,-1]])
+            roberst_v = np.array( [[2, 0],
+                                   [0,-2]])
             img_grad = cv2.filter2D(img, -1, roberst_v)
         
     if (dtype == cv2.CV_16S):
@@ -70,15 +70,23 @@ def Sobel_SplitPosNeg(img, Horizontal=True, ksize=3, UseScharr= False, UseSorbel
     else:
         neg_grad, pos_grad = SplitAbs_NegPos(img_grad)
 
-#    dbg_show = False
-    dbg_show = True
+    #th1 = cv2.adaptiveThreshold(img_grad, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    ret,th1 = cv2.threshold(img_grad,127,255,cv2.THRESH_BINARY)
+    blur = cv2.GaussianBlur(th1,(5,5),0)
+    ret3,th3 = cv2.threshold(blur,0,255,cv2.THRESH_TOZERO+cv2.THRESH_OTSU)
+    pos_grad = th3
+    neg_grad = th3
+
+    dbg_show = False
+#    dbg_show = True
     if dbg_show:
         fstat = cv2.minMaxLoc(img_grad); print(fstat)
         nstat = cv2.minMaxLoc(neg_grad); print(nstat)
         pstat = cv2.minMaxLoc(pos_grad); print(pstat)
-        plt.subplot(1,3,1), plt.imshow(img_grad, 'gray'), plt.title('Float-gradiant')
-        plt.subplot(1,3,2), plt.imshow(neg_grad, 'gray'), plt.title('NegU8-gradiant')
-        plt.subplot(1,3,3), plt.imshow(pos_grad, 'gray'), plt.title('PosU8-gradiant')
+        plt.subplot(1,4,1), plt.imshow(img_grad, 'gray'), plt.title('Float-gradiant')
+        plt.subplot(1,4,2), plt.imshow(neg_grad, 'gray'), plt.title('NegU8-gradiant')
+        plt.subplot(1,4,3), plt.imshow(pos_grad, 'gray'), plt.title('PosU8-gradiant')
+        plt.subplot(1,4,4), plt.imshow(th3, 'gray'), plt.title('Threshold')
         plt.show()
     return neg_grad, pos_grad
 
@@ -96,7 +104,7 @@ def EqualizeIntensity(img, CLAHE=True):
     img_eq = cv2.cvtColor(hls_eq,cv2.COLOR_HLS2BGR)
 
     dbg_show = False
-    dbg_show = True
+    #dbg_show = True
     if dbg_show:
         plt.subplot(1,2,1), plt.hist(l.flatten(),256,[0,256], color = 'b')
         plt.subplot(1,2,2), plt.hist(leq.flatten(),256,[0,256], color = 'r')
@@ -115,8 +123,8 @@ def get_corners_xy(img, maxCorners=128):
     blockSize = 3      # Default =3, Size of an average block for computing a derivative covariation matrix over each pixel neighborhood
     CornerS = cv2.goodFeaturesToTrack(img, maxCorners, qualityLevel, minDistance, blockSize = blockSize)
 
-#    dbg_show = False
-    dbg_show = True
+    dbg_show = False
+#    dbg_show = True
     if dbg_show:
         img_abs = convert2absU8(img)
         img_rgb = cv2.cvtColor(img_abs, cv2.COLOR_GRAY2RGB)
@@ -209,9 +217,9 @@ def show_edges(gray, edge_x, edge_y, clusters = 10):
             cv2.circle(img_y, (x,y), 1, colorS[1], -1) 
     lbl_x = "show_edges: x-sobel %d" % edge_x.shape[0]
     lbl_y = "show_edges: y-sobel %d" % edge_y.shape[0]
-    plt.subplot(1,2,1), plt.imshow(img_x), plt.title(lbl_x)
-    plt.subplot(1,2,2), plt.imshow(img_y), plt.title(lbl_y)
-    plt.show()
+    #plt.subplot(1,2,1), plt.imshow(img_x), plt.title(lbl_x)
+    #plt.subplot(1,2,2), plt.imshow(img_y), plt.title(lbl_y)
+    #plt.show()
 
 
 #### 2D Edge0-Feature Histogram #####
@@ -238,9 +246,9 @@ def get_edges(gray, img_name= None):
     Use_PosNeg_Gradiant_Splitting = True  # Tradeoff feature quantity vs speed  - 300 ms
     if Use_PosNeg_Gradiant_Splitting:
         # Split the sobel results into Pos,|Neg| features -> Yields More information -> more edges (28 ms- 14 ms/call)
-        ksize=3
-        img_dxNeg, img_dxPos = Sobel_SplitPosNeg(gray, Horizontal=True, ksize=ksize, UseScharr= False, UseSorbel= True, UseRoberts= False)
-        img_dyNeg, img_dyPos = Sobel_SplitPosNeg(gray, Horizontal=False, ksize=ksize, UseScharr= False, UseSorbel= True, UseRoberts= False)
+        #ksize=3
+        #img_dxNeg, img_dxPos = Sobel_SplitPosNeg(gray, Horizontal=True, ksize=ksize, UseScharr= False, UseSorbel= True, UseRoberts= False)
+        #img_dyNeg, img_dyPos = Sobel_SplitPosNeg(gray, Horizontal=False, ksize=ksize, UseScharr= False, UseSorbel= True, UseRoberts= False)
         ksize=2
         img_dxNeg, img_dxPos = Sobel_SplitPosNeg(gray, Horizontal=True,  ksize=ksize, UseScharr= False, UseSorbel= False, UseRoberts= True)
         img_dyNeg, img_dyPos = Sobel_SplitPosNeg(gray, Horizontal=False, ksize=ksize, UseScharr= False, UseSorbel= False, UseRoberts= True)
@@ -248,14 +256,16 @@ def get_edges(gray, img_name= None):
                                       
 
         # (200 ms - 50 ms/img)
-        edge_xNeg = get_corners_xy(img_dxNeg, maxCorners)
+        #edge_xNeg = get_corners_xy(img_dxNeg, maxCorners)
         edge_xPos = get_corners_xy(img_dxPos, maxCorners)
-        edge_yNeg = get_corners_xy(img_dyNeg, maxCorners)
+        #edge_yNeg = get_corners_xy(img_dyNeg, maxCorners)
         edge_yPos = get_corners_xy(img_dyPos, maxCorners)
 
         # Merge the edges from the Pos,|Neg| sobel channels
-        edge_x = np.append(edge_xNeg, edge_xPos, 0)
-        edge_y = np.append(edge_yNeg, edge_yPos, 0)
+        #edge_x = np.append(edge_xNeg, edge_xPos, 0)
+        #edge_y = np.append(edge_yNeg, edge_yPos, 0)
+        edge_x = edge_xPos
+        edge_y = edge_yPos
 
     else:  # Faster  sobel without splitting - Result: Dont get as many edges as with splitting
         # (16 ms - 8 ms/img)
@@ -268,7 +278,7 @@ def get_edges(gray, img_name= None):
     ##xx show_edges(gray, edge_x, edge_y, clusters=10)
 
     # Conbine X & Y edges
-    edgeS = np.append(edge_x, edge_yNeg, 0)
+    edgeS = np.append(edge_x, edge_yPos, 0)
     edgeN = edgeS.shape[0]
 
     #### 2D Edge0-Feature Histogram #####
@@ -458,7 +468,7 @@ def get_edges(gray, img_name= None):
 
     #print(cv2.minMaxLoc(hst_01)) ####
     np.multiply(hst_flt, hst_01, out= hst_flt)
-##xx  plt.subplot(1,3,1), plt.imshow(hst_flt), plt.subplot(1,3,2), plt.imshow(hst), plt.subplot(1,3,3), plt.imshow(gray, 'gray'), plt.show()
+    #plt.subplot(1,3,1), plt.imshow(hst_flt), plt.subplot(1,3,2), plt.imshow(hst), plt.subplot(1,3,3), plt.imshow(gray, 'gray'), plt.show()
     hst = hst_flt[2:-2, 2:-2]
     hst_01 = hst_01[2:-2,2:-2]
     ########## Histogtam blob Filters ##########
@@ -483,7 +493,7 @@ def get_edges(gray, img_name= None):
     px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
     py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
     px, py = np.sort(px), np.sort(py)  # sort the coord from low to high
-    # plt.imshow(hst_01), plt.show()
+    #plt.imshow(hst_01), plt.show()
 
     # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
     span = hsumy[px[0]:px[1]]
@@ -501,7 +511,7 @@ def get_edges(gray, img_name= None):
             pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
     hst_01[:,:pr[0]] = 0
     hst_01[:, pr[1]:] = 0
-    # plt.imshow(hst_01), plt.show()
+    #plt.imshow(hst_01), plt.show()
 
     # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
     span = hsumx[py[0]:py[1]]
@@ -519,7 +529,7 @@ def get_edges(gray, img_name= None):
             pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
     hst_01[:pr[0], :] = 0
     hst_01[pr[1]:, :] = 0
-    # plt.imshow(hst_01), plt.show()
+    #plt.imshow(hst_01), plt.show()
 
 
 
@@ -546,7 +556,7 @@ def get_edges(gray, img_name= None):
     cout = (chout + 0.5) * pixelsPerBin
 
     if False:
-##xx    if True:
+##    if True:
         fig, axS = plt.subplots(1,2)
         ax = axS.ravel()
         #ax[0].plot([avgx], [avgy], marker='o', markersize=5, color="yellow")
