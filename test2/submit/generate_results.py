@@ -468,7 +468,7 @@ def get_edges(gray, img_name= None):
 
     # Sanity check in case the image has no blobs
     if 0 == xmax.size or 0 == ymax.size:
-        return np.array([[],[]]), (0,0)
+        return [0,0], [0,0], (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
 
     psumy, psumx = hsumy[xmax], hsumx[ymax]  # get the corresponding peak values
     xsrt, ysrt = np.argsort(psumy), np.argsort(psumx)  # get array to sort by peaks
@@ -532,13 +532,13 @@ def get_edges(gray, img_name= None):
 
     px, py = np.sort(px), np.sort(py) # sort the coord from low to high
     medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
-    cx, cy = medx * pixelsPerBin, medy * pixelsPerBin
     bx, by = np.int32((px + 0.5) * pixelsPerBin), np.int32((py + 0.5) * pixelsPerBin)
 
 
     if False:
 ##xx    if True:
         chout = np.array([ [px[0], py[0]], [px[1], py[0]], [px[1], py[1]], [px[0], py[1]] ])
+        cx, cy = int((medx +0.5) * pixelsPerBin), int((medy + 0.5) * pixelsPerBin)
         cout = (chout + 0.5) * pixelsPerBin
 
         fig, axS = plt.subplots(1,2)
@@ -555,8 +555,93 @@ def get_edges(gray, img_name= None):
         ax[1].imshow(gray, 'gray'), ax[1].set_title(img_name)
         plt.show()
 
-    return bx, by, (cx, cy), (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
+    return bx, by, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
 
+def plotbxy(px, py, color="red", linewidth=1, win=None):
+    pltx = np.array([px[0], px[1], px[1], px[0], px[0]])
+    plty = np.array([py[0], py[0], py[1], py[1], py[0]])
+    if win is None:
+        plt.plot(pltx, plty, color=color, linewidth=linewidth)
+    else:
+        win.plot(pltx, plty, color=color, linewidth=linewidth)
+
+def plotcxy(cx, cy, color="red", marker='+', linewidth=1, win=None):
+    if win is None:
+        plt.plot([cx], [cy], color=color, marker=marker, linewidth=linewidth)
+    else:
+        win.plot([cx], [cy], color=color, marker=marker, linewidth=linewidth)
+
+
+def gate_edge(ax, ay, rx, ry, rw, img_g, img_s, axis, posdir, gray, img_name= None):
+    """
+    Find the max peak = gate edge
+    ax,ay   : Achor cordinates
+    rx, ry  : Search Roi, tuples with min, max cordinats for x & y
+    img_g   : 1st image to find histogram peak of gate edge
+    img_s   : 2nd image to find histogram peak of gate scafolding
+    wx      : max with of scafolding (if visable)
+    """
+    #rg = Edge pos & improvements: 0=Initial ROI, 1=Edge corection, 2=Scafolding corection
+    if 0 == axis:
+        rg = [ [rx[0], rx[0], ax], [ax-rx[0], 0, 0]  ]
+    else:
+        rg = [ [ry[0], ry[0], ay], [ay-ry[0], 0, 0]  ]
+
+    #plotbxy(rx,ry),  plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
+    hst_r = img_g[ry[0]:ry[1], rx[0]:rx[1]]
+    sum_r = np.sum(hst_r, axis=axis)
+    # plt.plot(sum_r), plt.show()
+    threshold = hst_r.shape[axis] *2
+    peakinfo = find_peaks(sum_r, threshold=threshold, prominence=1)
+    peaks, psrt = peakinfo[0], np.argsort(peakinfo[1]['prominences'])
+    if 0 < peaks.size:
+        rg[1][1] = peaks[psrt[psrt.size - 1]]
+    #plt.subplot(1, 2, 1), plt.plot(sum_r), plt.subplot(1, 2, 2), plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
+    
+    # If we got an edge in rg[1] then try to improve it for scafolding
+    if 0 < rg[1][1]:
+        # Compute ROI for scafolding
+        r1 = rg[0][1] + rg[1][1]
+        if 0 == axis:
+            if posdir:
+                sx, sy = [r1, r1 +rw], ry
+            else:
+                sx, sy = [r1 -rw, r1], ry
+            rg[0][2] = sx[0]
+        else:
+            if posdir:
+                sx, sy = rx, [r1, r1 +rw]
+            else:
+                sx, sy = rx, [r1 -rw, r1]
+            rg[0][2] = sy[0]
+
+        # Find inner obstructions in a secondary peak = gate light-fixtures & scafolding
+        #plotbxy(sx,sy), plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
+        hst_r = img_s[sy[0]:sy[1], sx[0]:sx[1]]
+        sum_r = np.sum(hst_r, axis=axis)
+        # plt.plot(sum_r), plt.show()
+        threshold = hst_r.shape[axis]
+        peakinfo = find_peaks(sum_r, threshold=threshold, prominence=1)
+        peaks, psrt = peakinfo[0], np.argsort(peakinfo[1]['prominences'])
+        if 0 < peaks.size:
+            rg[1][2] = peaks[psrt[psrt.size - 1]]
+        else:
+            rg[0][2] = r1
+        #Splt.subplot(1, 2, 1), plt.plot(sum_r), plt.subplot(1, 2, 2), plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
+
+    if 0 == axis:
+        ex, ey = rg[0][2] + rg[1][2], ay
+    else:
+        ex, ey = ax, rg[0][2] + rg[1][2]
+    if True:
+        if 0 == axis:
+            gx, gy = rg[0][1] + rg[1][1], ay
+        else:
+            gx, gy = ax, rg[0][1] + rg[1][1]
+        plotbxy(rx,ry), plotcxy(gx,gy), plotcxy(ex,ey, color="Cyan")
+        plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
+
+    return ex, ey       
 
 
 def my_prediction(img, img_name= None):
@@ -600,73 +685,84 @@ def my_prediction(img, img_name= None):
         #gray = scale_intensity(gray, 255 / (255 - 20), dst=gray)
         #plt.imshow(gray, 'gray'), plt.title("gray - Preprocessed- Clip Max"), plt.show()
 
-    bx, by, (cx, cy), (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos) = get_edges(gray, img_name)
+    bx, by, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos) = get_edges(gray, img_name)
+    cx, cy = int((bx[0]+bx[1])/2), int((by[0]+by[1])/2)
     if False:
-#    if True:
-        cout = np.array([ [bx[0], by[0]], [bx[1], by[0]], [bx[1], by[1]], [bx[0], by[1]] ])
-
+#    if True:       
         fig, axS = plt.subplots(2,3)
-        ax = axS.ravel()
-        ax[0].plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        ax[0].plot(pxout, pyout, color="red", linewidth=1)
+        ax = axS.ravel()        
+        plotbxy(bx,by,win=ax[0]), plotcxy(cx,cy, win=ax[0])
         ax[0].imshow(img_dxNeg, 'gray'), ax[0].set_title("-dX Sobel "+ img_name)
 
-        ax[1].plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        ax[1].plot(pxout, pyout, color="red", linewidth=1)
+        plotbxy(bx,by,win=ax[1]), plotcxy(cx,cy, win=ax[1])
         ax[1].imshow(img_dxPos, 'gray'), ax[1].set_title("+dX Sobel "+ img_name)
 
-        ax[2].plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        ax[2].plot(pxout, pyout, color="red", linewidth=1)
+        plotbxy(bx,by,win=ax[2]), plotcxy(cx,cy, win=ax[2])
         ax[2].imshow(gray, 'gray'), ax[2].set_title(img_name)
 
-        ax[3].plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        ax[3].plot(pxout, pyout, color="red", linewidth=1)
+        plotbxy(bx,by,win=ax[3]), plotcxy(cx,cy, win=ax[3])
         ax[3].imshow(img_dyNeg, 'gray'), ax[3].set_title("-dY Sobel "+ img_name)
 
-        ax[4].plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        ax[4].plot(pxout, pyout, color="red", linewidth=1)
+        plotbxy(bx,by,win=ax[4]), plotcxy(cx,cy, win=ax[4])
         ax[4].imshow(img_dyPos, 'gray'), ax[4].set_title("+dY Sobel "+ img_name)
+
+        plotbxy(bx,by,win=ax[5]), plotcxy(cx,cy, win=ax[4])
+        img_dx = np.add(img_dxPos, img_dxNeg)
+        img_dy = np.add(img_dyPos, img_dyNeg)
+        img_dxy = np.add(img_dx, img_dy)
+        ax[5].imshow(img_dxy, 'gray'), ax[4].set_title("+dY Sobel "+ img_name)
         plt.show()
 
     ####### TODO #######
     ### Find the exact gate corner positions by analyzing the sobel'd image
-    #hst_bb = gray[by[0]:by[1], bx[0]:bx[1]]
-    hst_bb = gray[by[0]:by[1], bx[0]:bx[1]]
-    sumy, sumx = np.sum(hst_bb, axis=0), np.sum(hst_bb, axis=1)
-    # plt.subplot(1,3,1), plt.plot(sumy), plt.subplot(1,3,2), plt.plot(sumx), plt.subplot(1,3,3), plt.imshow(hst_bb),  plt.show() 
+    # Gate dim: inside = 8, out = 11 ->  width/2 = 3/2 * /((8+11)/2) = 3/19
+    gx, gy = by, by
+    dx, dy = (bx[1] - bx[0])/2.0 , (by[1] - by[0])/2.0 
+    wx, wy = int(dx *3/19), int(dy*3/19)    # Gate width
+    # Sanity check
+    if 4 < wx and 4 < wy:
+        # Left edge
+        ax, ay = bx[0], cy # anchor = best position so far = center of gate edge 
+        rx, ry = [ax-wx, ax +2*wx], [cy-wy, cy+wy]
+        left = gate_edge(ax, ay, rx, ry, wx, img_dxPos, img_dxNeg, axis=0, posdir=True, gray=gray, img_name=img_name)
 
-    peaks = find_peaks(sumy, prominence=1)
-    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
-    if 1 < pmax.size:
-        px = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+        ax, ay = bx[1], cy # anchor
+        rx, ry = [ax-2*wx, ax +wx], [cy-wy, cy+wy]
+        right = gate_edge(ax, ay, rx, ry, wx, img_dxNeg, img_dxPos, axis=0, posdir=False, gray=gray, img_name=img_name)
 
-    peaks = find_peaks(sumx, prominence=1)
-    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
-    if 1 < pmax.size:
-        py = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+    else:
+        gx, gy = by, by
+        print("TODO: Just use the ROI ##//")
 
-    px, py = np.sort(px), np.sort(py) # sort the coord from low to high
-#    if False:
-    if True:
-        pltx = np.array([px[0], px[1], px[1], px[0], px[0]])
-        plty = np.array([py[0], py[0], py[1], py[1], py[0]])
-        plt.plot(pltx, plty, color="red", linewidth=1)
-        plt.imshow(hst_bb, 'gray'), plt.title(img_name), plt.show()
+    if False:
+        #hst_bb = gray[by[0]:by[1], bx[0]:bx[1]]
+        hst_bb = gray[by[0]:by[1], bx[0]:bx[1]]
+        sumy, sumx = np.sum(hst_bb, axis=0), np.sum(hst_bb, axis=1)
+        # plt.subplot(1,3,1), plt.plot(sumy), plt.subplot(1,3,2), plt.plot(sumx), plt.subplot(1,3,3), plt.imshow(hst_bb),  plt.show() 
 
-    bx, by = px + by[0] , py + by[0]
+        peaks = find_peaks(sumy, prominence=1)
+        pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
+        if 1 < pmax.size:
+            px = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+
+        peaks = find_peaks(sumx, prominence=1)
+        pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
+        if 1 < pmax.size:
+            py = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+
+        px, py = np.sort(px), np.sort(py) # sort the coord from low to high
+    #    if False:
+        if True:
+            plotbxy(px,py)
+            plt.imshow(hst_bb, 'gray'), plt.title(img_name), plt.show()
+
+        bx, by = px + by[0] , py + by[0]
     ####### TODO #######
 
 ##xx    dbg_show = True
     dbg_show = False
     if dbg_show:
-        plt.plot([cx], [cy], marker='+', markersize=15, color="red")
-        pxout, pyout = np.append(cout[:, 0], cout[0, 0]), np.append(cout[:, 1], cout[0, 1])
-        plt.plot(pxout, pyout, color="red", linewidth=3)
+        plotbxy(gx,gy)
         plt.imshow(gray, 'gray'), plt.title(img_name)
         plt.show()
 
