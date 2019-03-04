@@ -573,73 +573,55 @@ def find_gate_roi(gray, img_name= None):
     return gx, gy, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
 
 
-def find_gate_edge(ax, ay, rx, ry, rw, img_g, img_s, axis, posdir, gray, img_name= None):
+def find_gate_edge(ax, ay, rx, ry, rw, img_g, axis, posdir, gray, img_name= None):
     """
     Find the max peak = gate edge
-    ax,ay   : Achor cordinates
+    ax,ay   : Anchor cordinates
     rx, ry  : Search Roi, tuples with min, max cordinats for x & y
     img_g   : 1st image to find histogram peak of gate edge
-    img_s   : 2nd image to find histogram peak of gate scafolding
-    wx      : max with of scafolding (if visable)
+    rw      : max with of scafolding (if visable)
     """
     #rg = Edge pos & improvements: 0=Initial ROI, 1=Edge corection, 2=Scafolding corection
     if 0 == axis:
         rg = [ [rx[0], rx[0], ax], [ax-rx[0], 0, 0]  ]
+        rp = ax
     else:
         rg = [ [ry[0], ry[0], ay], [ay-ry[0], 0, 0]  ]
-
-    #plotbxy(rx,ry),  plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
+        rp = ay
     hst_r = img_g[ry[0]:ry[1], rx[0]:rx[1]]
-    sum_r = np.sum(hst_r, axis=axis)
-    # plt.plot(sum_r), plt.show()
-    threshold = hst_r.shape[axis] *2
-    peakinfo = find_peaks(sum_r, threshold=threshold, prominence=1)
+    sum_r = np.sum(hst_r, axis=axis)    
+    # plt.plot(sum_r), plt.show()    
+    peakinfo = find_peaks(sum_r, height=max(sum_r)/3, distance=rw/3, prominence=1)
+    #threshold = hst_r.shape[axis]*5
+    #peakinfo = find_peaks(sum_r, threshold=threshold, distance=rw/3, prominence=1)
     peaks, psrt = peakinfo[0], np.argsort(peakinfo[1]['prominences'])
     if 0 < peaks.size:
-        rg[1][1] = peaks[psrt[psrt.size - 1]]
-    #plt.subplot(1, 2, 1), plt.plot(sum_r), plt.subplot(1, 2, 2), plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
-    
-    # If we got an edge in rg[1] then try to improve it for scafolding
-    if 0 < rg[1][1]:
-        # Compute ROI for scafolding
-        r1 = rg[0][1] + rg[1][1]
-        if 0 == axis:
-            if posdir:
-                sx, sy = [r1, r1 +rw], ry
-            else:
-                sx, sy = [r1 -rw, r1], ry
-            rg[0][2] = sx[0]
+        if posdir:
+            rp = peaks[peaks.size -1]
         else:
-            if posdir:
-                sx, sy = rx, [r1, r1 +rw]
-            else:
-                sx, sy = rx, [r1 -rw, r1]
-            rg[0][2] = sy[0]
-
-        # Find inner obstructions in a secondary peak = gate light-fixtures & scafolding
-        #plotbxy(sx,sy), plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
-        hst_r = img_s[sy[0]:sy[1], sx[0]:sx[1]]
-        sum_r = np.sum(hst_r, axis=axis)
-        # plt.plot(sum_r), plt.show()
-        threshold = hst_r.shape[axis]
-        peakinfo = find_peaks(sum_r, threshold=threshold, prominence=1)
+            rp = peaks[0]
+    if False:
         peaks, psrt = peakinfo[0], np.argsort(peakinfo[1]['prominences'])
         if 0 < peaks.size:
-            rg[1][2] = peaks[psrt[psrt.size - 1]]
-        else:
-            rg[0][2] = r1
-        #Splt.subplot(1, 2, 1), plt.plot(sum_r), plt.subplot(1, 2, 2), plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
-
+            peaks = peaks[psrt[::-1]] # Peaks sorted in decreasing prominance order
+            if 1 < peaks.size:   # Pick the one further in wanted direction
+                if posdir:
+                    rp = max(peaks[0:2])
+                else:
+                    rp = min(peaks[0:2])
+            else:
+                rp = peaks[0]
+    #plotbxy(rx,ry), plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
+    #plt.subplot(1, 2, 1), plt.plot(sum_r), plt.subplot(1, 2, 2),  plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
+        
+        
     if 0 == axis:
-        ex, ey = rg[0][2] + rg[1][2], ay
+        ex, ey = rx[0] + rp, ay
     else:
-        ex, ey = ax, rg[0][2] + rg[1][2]
-    if True:
-        if 0 == axis:
-            gx, gy = rg[0][1] + rg[1][1], ay
-        else:
-            gx, gy = ax, rg[0][1] + rg[1][1]
-        plotbxy(rx,ry), plotcxy(gx,gy), plotcxy(ex,ey, color="Cyan")
+        ex, ey = ax, ry[0] + rp
+#    if True:
+    if False:
+        plotbxy(rx,ry), plotcxy(ex,ey, color="Cyan")
         plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
 
     return ex, ey       
@@ -710,14 +692,34 @@ def my_prediction(img, img_name= None):
     wx, wy = int(dx *3/19), int(dy*3/19)    # Gate width
     # Sanity check
     if 4 < wx and 4 < wy:
+        wx, wy = wx//2, wy//2
+        img_dx = np.add(img_dxNeg, img_dxPos)
+        hwx, vwy = 5*wx, wy
+        hwy, vwx = 5*wy, wx
+        left  = np.array([ [bx[0], bx[0], bx[0]], [by[0]+hwy, cy, by[1]-hwy] ])
+        right = np.array([ [bx[1], bx[1], bx[1]], [by[0]+hwy, cy, by[1]-hwy] ])
+        top   = np.array([ [bx[0]+hwx, cx, bx[1]-+hwx], [by[0], by[0], by[0]] ])
+        btm   = np.array([ [bx[0]+hwx, cx, bx[1]-+hwx], [by[1], by[1], by[1]] ])
+
         # Left edge
         ax, ay = bx[0], cy # anchor = best position so far = center of gate edge 
-        rx, ry = [ax-wx, ax +2*wx], [cy-wy, cy+wy]
-        left = find_gate_edge(ax, ay, rx, ry, wx, img_dxPos, img_dxNeg, axis=0, posdir=True, gray=gray, img_name=img_name)
+        rx, ry = [ax-wx, ax + hwx], [cy-vwy, cy+vwy]
+        left[0,1],left[1,1] = find_gate_edge(ax, ay, rx, ry, wx, img_dx, axis=0, posdir=True, gray=gray, img_name=img_name)
 
         ax, ay = bx[1], cy # anchor
-        rx, ry = [ax-2*wx, ax +wx], [cy-wy, cy+wy]
-        right = find_gate_edge(ax, ay, rx, ry, wx, img_dxNeg, img_dxPos, axis=0, posdir=False, gray=gray, img_name=img_name)
+        rx, ry = [ax-hwx, ax +wx], [cy-vwy, cy+vwy]
+        right[0,1],right[1,1] = find_gate_edge(ax, ay, rx, ry, wx, img_dx, axis=0, posdir=False, gray=gray, img_name=img_name)
+
+        if True:
+            wx,wy = wx*4,wy*4
+            plt_g = gray[by[0]-wx:by[1]+wx, bx[0]-wy:bx[1]+wy]
+            plt_p = np.hstack((left, right, top, btm))
+            plt_p[0,:] -= bx[0]-wx
+            plt_p[1,:] -= by[0]-wy     
+            for i in range(plt_p.shape[1]):
+                plotcxy(plt_p[0,i], plt_p[1,i], color="Red", linewidth=2)
+            plt.imshow(plt_g, 'gray'), plt.title(img_name)
+            plt.show()
 
     else:
         gx, gy = by, by
