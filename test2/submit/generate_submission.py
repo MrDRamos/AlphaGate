@@ -32,8 +32,9 @@ def UseTrainingImages(qty=20):
     ## data_ofs = img_keys.index('IMG_9180.JPG')  # + angle + partial gates
     #data_ofs = img_keys.index('IMG_0638.JPG')  # large + angle
     #data_ofs = img_keys.index('IMG_0664.JPG')  # large + angle
-    data_ofs = img_keys.index('IMG_1625.JPG') # no gate, 492, 5199
-    data_ofs = img_keys.index('IMG_0711.JPG') # small + angle
+    #data_ofs = img_keys.index('IMG_0711.JPG') # small + angle
+    #data_ofs = img_keys.index('IMG_1625.JPG') # no gate, 492, 5199
+    data_ofs = img_keys.index('IMG_1640.JPG') # small + angle
     img_keys = img_keys[data_ofs: data_ofs + qty]
 
 UseTrainingImages()

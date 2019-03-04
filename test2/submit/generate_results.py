@@ -154,7 +154,22 @@ def get_colors(count, stepsize=None):
     return rgb_colors
 
 
-def show_edge_custers(img, edge_p, clusters):
+def plotbxy(px, py, color="red", linewidth=1, win=None):
+    pltx = np.array([px[0], px[1], px[1], px[0], px[0]])
+    plty = np.array([py[0], py[0], py[1], py[1], py[0]])
+    if win is None:
+        plt.plot(pltx, plty, color=color, linewidth=linewidth)
+    else:
+        win.plot(pltx, plty, color=color, linewidth=linewidth)
+
+def plotcxy(cx, cy, color="red", marker='+', linewidth=1, win=None):
+    if win is None:
+        plt.plot([cx], [cy], color=color, marker=marker, linewidth=linewidth)
+    else:
+        win.plot([cx], [cy], color=color, marker=marker, linewidth=linewidth)
+
+
+def plot_edge_clusters(img, edge_p, clusters):
     colorS = get_colors(clusters)
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 5.0)
     ret,labelS,centerS = cv2.kmeans(edge_p, clusters, None, criteria, 16, cv2.KMEANS_PP_CENTERS)
@@ -172,7 +187,7 @@ def show_edge_custers(img, edge_p, clusters):
             cv2.circle(img, (x,y), 1, color, -1)
 
 # img = gray 1 channnel
-def show_edges(gray, edge_x, edge_y, clusters = 10):
+def plot_edge_features(gray, edge_x, edge_y, clusters = 10):
     img_abs = convert2absU8(gray)
     img_x = cv2.cvtColor(img_abs, cv2.COLOR_GRAY2RGB)
     img_x = scale_intensity(img_x, 0.5)
@@ -187,8 +202,8 @@ def show_edges(gray, edge_x, edge_y, clusters = 10):
 #    cx, cy = int((cxx+ cyx) * edge_x.shape[0]/n) , int((cxy +cyy) * edge_y.shape[0]/n)
 
     if 0 < clusters:
-        show_edge_custers(img_x, edge_x, clusters)
-        show_edge_custers(img_y, edge_y, clusters)
+        plot_edge_clusters(img_x, edge_x, clusters)
+        plot_edge_clusters(img_y, edge_y, clusters)
     else:
         colorS = get_colors(2)
         for p in edge_x:
@@ -197,8 +212,8 @@ def show_edges(gray, edge_x, edge_y, clusters = 10):
         for p in edge_y:
             x,y = p.ravel()
             cv2.circle(img_y, (x,y), 1, colorS[1], -1) 
-    lbl_x = "show_edges: x-sobel %d" % edge_x.shape[0]
-    lbl_y = "show_edges: y-sobel %d" % edge_y.shape[0]
+    lbl_x = "plot_edge_features: x-sobel %d" % edge_x.shape[0]
+    lbl_y = "plot_edge_features: y-sobel %d" % edge_y.shape[0]
     plt.subplot(1,2,1), plt.imshow(img_x), plt.title(lbl_x)
     plt.subplot(1,2,2), plt.imshow(img_y), plt.title(lbl_y)
     plt.show()
@@ -412,7 +427,7 @@ def hst_filter(hst, img_name= None):
 
     
 
-def get_edges(gray, img_name= None):
+def find_gate_roi(gray, img_name= None):
     # Extract edge features
     maxCorners  = 250 #128  at lead 40/corner + Top/Btm AIRR Lables + some outliers which we will have to filter
     ksize = 3   # kernal size
@@ -440,8 +455,8 @@ def get_edges(gray, img_name= None):
         # (100 ms - 50 ms/img)
         edge_x = get_corners_xy(img_dx, maxCorners)
         edge_y = get_corners_xy(img_dy, maxCorners)
-    #show_edges(gray, edge_x, edge_y)
-    ##xx show_edges(gray, edge_x, edge_y, clusters=10)
+    #plot_edge_features(gray, edge_x, edge_y)
+    ##xx plot_edge_features(gray, edge_x, edge_y, clusters=10)
 
     # Conbine X & Y edges
     edgeS = np.append(edge_x, edge_y, 0)
@@ -468,7 +483,7 @@ def get_edges(gray, img_name= None):
 
     # Sanity check in case the image has no blobs
     if 0 == xmax.size or 0 == ymax.size:
-        return [0,0], [0,0], (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
+        return None, None, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
 
     psumy, psumx = hsumy[xmax], hsumx[ymax]  # get the corresponding peak values
     xsrt, ysrt = np.argsort(psumy), np.argsort(psumx)  # get array to sort by peaks
@@ -532,7 +547,7 @@ def get_edges(gray, img_name= None):
 
     px, py = np.sort(px), np.sort(py) # sort the coord from low to high
     medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
-    bx, by = np.int32((px + 0.5) * pixelsPerBin), np.int32((py + 0.5) * pixelsPerBin)
+    gx, gy = np.int32((px + 0.5) * pixelsPerBin), np.int32((py + 0.5) * pixelsPerBin)
 
 
     if False:
@@ -555,24 +570,10 @@ def get_edges(gray, img_name= None):
         ax[1].imshow(gray, 'gray'), ax[1].set_title(img_name)
         plt.show()
 
-    return bx, by, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
-
-def plotbxy(px, py, color="red", linewidth=1, win=None):
-    pltx = np.array([px[0], px[1], px[1], px[0], px[0]])
-    plty = np.array([py[0], py[0], py[1], py[1], py[0]])
-    if win is None:
-        plt.plot(pltx, plty, color=color, linewidth=linewidth)
-    else:
-        win.plot(pltx, plty, color=color, linewidth=linewidth)
-
-def plotcxy(cx, cy, color="red", marker='+', linewidth=1, win=None):
-    if win is None:
-        plt.plot([cx], [cy], color=color, marker=marker, linewidth=linewidth)
-    else:
-        win.plot([cx], [cy], color=color, marker=marker, linewidth=linewidth)
+    return gx, gy, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
 
 
-def gate_edge(ax, ay, rx, ry, rw, img_g, img_s, axis, posdir, gray, img_name= None):
+def find_gate_edge(ax, ay, rx, ry, rw, img_g, img_s, axis, posdir, gray, img_name= None):
     """
     Find the max peak = gate edge
     ax,ay   : Achor cordinates
@@ -645,22 +646,7 @@ def gate_edge(ax, ay, rx, ry, rw, img_g, img_s, axis, posdir, gray, img_name= No
 
 
 def my_prediction(img, img_name= None):
-    gray = None
-    if False:  # See if removing blue channel improves hamdling glarae: No
-        b, g, r = cv2.split(img)
-        plt.subplot(1, 3, 1), plt.imshow(b, 'Blues')
-        plt.subplot(1, 3, 2), plt.imshow(g, 'Greens')
-        plt.subplot(1, 3, 3), plt.imshow(r, 'Reds')
-        plt.show()
-        if False: # Remove blue(Main Gate coler) -> Increases intensity changes
-            b = b * 0
-        img_coler_filtered = cv2.merge((b, g, r))
-        gray = cv2.cvtColor(img_coler_filtered, cv2.COLOR_RGB2GRAY)
-        plt.subplot(1, 2, 1), plt.imshow(img_coler_filtered)
-        plt.subplot(1, 2, 2), plt.imshow(gray)
-        plt.show()
-    if (gray is None):
-        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         
     # View if clipping high intenity to remove glare. Yes: its used below
     if False:
@@ -685,7 +671,10 @@ def my_prediction(img, img_name= None):
         #gray = scale_intensity(gray, 255 / (255 - 20), dst=gray)
         #plt.imshow(gray, 'gray'), plt.title("gray - Preprocessed- Clip Max"), plt.show()
 
-    bx, by, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos) = get_edges(gray, img_name)
+    bx, by, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos) = find_gate_roi(gray, img_name)
+    if bx is None:
+      return None
+
     cx, cy = int((bx[0]+bx[1])/2), int((by[0]+by[1])/2)
     if False:
 #    if True:       
@@ -724,39 +713,16 @@ def my_prediction(img, img_name= None):
         # Left edge
         ax, ay = bx[0], cy # anchor = best position so far = center of gate edge 
         rx, ry = [ax-wx, ax +2*wx], [cy-wy, cy+wy]
-        left = gate_edge(ax, ay, rx, ry, wx, img_dxPos, img_dxNeg, axis=0, posdir=True, gray=gray, img_name=img_name)
+        left = find_gate_edge(ax, ay, rx, ry, wx, img_dxPos, img_dxNeg, axis=0, posdir=True, gray=gray, img_name=img_name)
 
         ax, ay = bx[1], cy # anchor
         rx, ry = [ax-2*wx, ax +wx], [cy-wy, cy+wy]
-        right = gate_edge(ax, ay, rx, ry, wx, img_dxNeg, img_dxPos, axis=0, posdir=False, gray=gray, img_name=img_name)
+        right = find_gate_edge(ax, ay, rx, ry, wx, img_dxNeg, img_dxPos, axis=0, posdir=False, gray=gray, img_name=img_name)
 
     else:
         gx, gy = by, by
         print("TODO: Just use the ROI ##//")
 
-    if False:
-        #hst_bb = gray[by[0]:by[1], bx[0]:bx[1]]
-        hst_bb = gray[by[0]:by[1], bx[0]:bx[1]]
-        sumy, sumx = np.sum(hst_bb, axis=0), np.sum(hst_bb, axis=1)
-        # plt.subplot(1,3,1), plt.plot(sumy), plt.subplot(1,3,2), plt.plot(sumx), plt.subplot(1,3,3), plt.imshow(hst_bb),  plt.show() 
-
-        peaks = find_peaks(sumy, prominence=1)
-        pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
-        if 1 < pmax.size:
-            px = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
-
-        peaks = find_peaks(sumx, prominence=1)
-        pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
-        if 1 < pmax.size:
-            py = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
-
-        px, py = np.sort(px), np.sort(py) # sort the coord from low to high
-    #    if False:
-        if True:
-            plotbxy(px,py)
-            plt.imshow(hst_bb, 'gray'), plt.title(img_name), plt.show()
-
-        bx, by = px + by[0] , py + by[0]
     ####### TODO #######
 
 ##xx    dbg_show = True
@@ -779,9 +745,9 @@ class GenerateFinalDetections():
     def predict(self, img, img_name ="na"):
         bb = my_prediction(img, img_name)
         if bb is None:
-            bb_all = []
-        else:
-            # We could have more than 1 bb ..
-            bb_all = np.array([np.append(bb, .5)])
+            return [[]]
+        
+        # We could have more than 1 bb ..
+        bb_all = np.array([np.append(bb, .5)])
         return bb_all.tolist()
 
