@@ -155,6 +155,9 @@ def get_colors(count, stepsize=None):
 
 
 def plotbxy(px, py, color="red", linewidth=1, win=None):
+    """
+    plot box: px,py contain the min,max range coords
+    """
     pltx = np.array([px[0], px[1], px[1], px[0], px[0]])
     plty = np.array([py[0], py[0], py[1], py[1], py[0]])
     if win is None:
@@ -162,11 +165,11 @@ def plotbxy(px, py, color="red", linewidth=1, win=None):
     else:
         win.plot(pltx, plty, color=color, linewidth=linewidth)
 
-def plotcxy(cx, cy, color="red", marker='+', linewidth=1, win=None):
+def plotcxy(cx, cy, color="red", marker='+', markersize=8, linewidth=1, win=None):
     if win is None:
-        plt.plot([cx], [cy], color=color, marker=marker, linewidth=linewidth)
+        plt.plot([cx], [cy], color=color, marker=marker, markersize=markersize, linewidth=linewidth)
     else:
-        win.plot([cx], [cy], color=color, marker=marker, linewidth=linewidth)
+        win.plot([cx], [cy], color=color, marker=marker, markersize=markersize, linewidth=linewidth)
 
 
 def plot_edge_clusters(img, edge_p, clusters):
@@ -611,8 +614,8 @@ def find_gate_edge(ax, ay, rx, ry, rw, img_g, axis, posdir, gray, img_name= None
                     rp = min(peaks[0:2])
             else:
                 rp = peaks[0]
-    #plotbxy(rx,ry), plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
-    #plt.subplot(1, 2, 1), plt.plot(sum_r), plt.subplot(1, 2, 2),  plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
+    # plotbxy(rx,ry), plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
+    # plt.subplot(1, 2, 1), plt.plot(sum_r), plt.subplot(1, 2, 2),  plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
         
         
     if 0 == axis:
@@ -687,38 +690,91 @@ def my_prediction(img, img_name= None):
     ####### TODO #######
     ### Find the exact gate corner positions by analyzing the sobel'd image
     # Gate dim: inside = 8, out = 11 ->  width/2 = 3/2 * /((8+11)/2) = 3/19
-    gx, gy = by, by
+    gx, gy = bx, by
     dx, dy = (bx[1] - bx[0])/2.0 , (by[1] - by[0])/2.0 
     wx, wy = int(dx *3/19), int(dy*3/19)    # Gate width
     # Sanity check
     if 4 < wx and 4 < wy:
-        wx, wy = wx//2, wy//2
         img_dx = np.add(img_dxNeg, img_dxPos)
-        hwx, vwy = 5*wx, wy
-        hwy, vwx = 5*wy, wx
-        left  = np.array([ [bx[0], bx[0], bx[0]], [by[0]+hwy, cy, by[1]-hwy] ])
-        right = np.array([ [bx[1], bx[1], bx[1]], [by[0]+hwy, cy, by[1]-hwy] ])
-        top   = np.array([ [bx[0]+hwx, cx, bx[1]-+hwx], [by[0], by[0], by[0]] ])
-        btm   = np.array([ [bx[0]+hwx, cx, bx[1]-+hwx], [by[1], by[1], by[1]] ])
+        img_dy = np.add(img_dyNeg, img_dyPos)
 
-        # Left edge
-        ax, ay = bx[0], cy # anchor = best position so far = center of gate edge 
-        rx, ry = [ax-wx, ax + hwx], [cy-vwy, cy+vwy]
-        left[0,1],left[1,1] = find_gate_edge(ax, ay, rx, ry, wx, img_dx, axis=0, posdir=True, gray=gray, img_name=img_name)
+        wx, wy = wx//2, wy//2
+        vwxn,vwxp, vwy = 2*wx,5*wx,wy # left,Right edge (neg and pos) vwxn,vwxp=, vwy= vertical range
+        hwyn,hwyp, hwx = 2*wy,5*wy,wx # top,bottom edge (neg and pos) hwyn,hwyp=, hwx= horizonal range
+        lft = np.array([ [bx[0]    , bx[0], bx[0]]     , [by[0]+hwyp, cy   , by[1]-hwyp] ])
+        rht = np.array([ [bx[1]    , bx[1], bx[1]]     , [by[0]+hwyp, cy   , by[1]-hwyp] ])
+        top = np.array([[bx[0]+vwxp, cx, bx[1]-+vwxp], [by[0], by[0], by[0]]])
+        btm = np.array([[bx[0]+vwxp, cx, bx[1]-+vwxp], [by[1], by[1], by[1]]])
 
-        ax, ay = bx[1], cy # anchor
-        rx, ry = [ax-hwx, ax +wx], [cy-vwy, cy+vwy]
-        right[0,1],right[1,1] = find_gate_edge(ax, ay, rx, ry, wx, img_dx, axis=0, posdir=False, gray=gray, img_name=img_name)
+        patch = np.array([
+            [[lft[0,0] - vwxn, lft[0,0] + vwxp], [lft[1,0] - vwy, lft[1,0] + vwy]],
+            [[lft[0,1] - vwxn, lft[0,1] + vwxp], [lft[1,1] - vwy, lft[1,1] + vwy]],
+            [[lft[0,2] - vwxn, lft[0,2] + vwxp], [lft[1,2] - vwy, lft[1,2] + vwy]],
+            [[rht[0,0] - vwxp, rht[0,0] + vwxn], [rht[1,0] - vwy, rht[1,0] + vwy]],
+            [[rht[0,1] - vwxp, rht[0,1] + vwxn], [rht[1,1] - vwy, rht[1,1] + vwy]],
+            [[rht[0,2] - vwxp, rht[0,2] + vwxn], [rht[1,2] - vwy, rht[1,2] + vwy]],
+            [[top[0,0] - hwx, top[0,0] + hwx], [top[1,0] - hwyn, top[1,0] + hwyp]],
+            [[top[0,1] - hwx, top[0,1] + hwx], [top[1,1] - hwyn, top[1,1] + hwyp]],
+            [[top[0,2] - hwx, top[0,2] + hwx], [top[1,2] - hwyn, top[1,2] + hwyp]],
+            [[btm[0,0] - hwx, btm[0,0] + hwx], [btm[1,0] - hwyp, btm[1,0] + hwyn]],
+            [[btm[0,1] - hwx, btm[0,1] + hwx], [btm[1,1] - hwyp, btm[1,1] + hwyn]],
+            [[btm[0,2] - hwx, btm[0,2] + hwx], [btm[1,2] - hwyp, btm[1,2] + hwyn]],
+            ])
+
+        if False:
+#        if True:
+            pwx, pwy = wx * 4, wy * 4
+            pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
+            plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
+            plt.imshow(plt_g, 'gray'), plt.title(img_name)
+            plotbxy(bx-pbx[0], by-pby[0])
+
+            for i in range(patch.shape[0]):
+                plotbxy(patch[i,0]-pbx[0], patch[i,1]-pby[0], color="Red")
+
+            plt_p = np.hstack((lft, rht, top, btm))
+            plt_p[0, :] -= pbx[0]
+            plt_p[1, :] -= pby[0]
+            for i in range(plt_p.shape[1]):
+                plotcxy(plt_p[0, i], plt_p[1, i], color="Red", linewidth=2)
+            plt.show()
+
+        side = 0  # 0=left, 1=right, 2=top, 3=bottom
+        for sn in range(0, 3):   # 0,1,2 patch within a side
+            pn = 3*side + sn       # patch number
+            lft[0,sn], lft[1,sn] = find_gate_edge(lft[0,sn], lft[1,sn], patch[pn,0], patch[pn,1], wx, img_dx, axis=0, posdir=True, gray=gray, img_name=img_name)
+
+        side = 1  # 0=left, 1=right, 2=top, 3=bottom
+        for sn in range(0, 3):   # 0,1,2 patch within a side
+            pn = 3*side + sn       # patch number
+            rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], wx, img_dx, axis=0, posdir=False, gray=gray, img_name=img_name)
+
+        side = 2  # 0=left, 1=right, 2=top, 3=bottom
+        for sn in range(0, 3):   # 0,1,2 patch within a side
+            pn = 3*side + sn       # patch number
+            top[0,sn], top[1,sn] = find_gate_edge(top[0,sn], top[1,sn], patch[pn,0], patch[pn,1], wy, img_dy, axis=1, posdir=True, gray=gray, img_name=img_name)
+
+        side = 3  # 0=left, 1=right, 2=top, 3=bottom
+        for sn in range(0, 3):   # 0,1,2 patch within a side
+            pn = 3*side + sn       # patch number
+            btm[0,sn], btm[1,sn] = find_gate_edge(btm[0,sn], btm[1,sn], patch[pn,0], patch[pn,1], wy, img_dy, axis=1, posdir=False, gray=gray, img_name=img_name)
 
         if True:
-            wx,wy = wx*4,wy*4
-            plt_g = gray[by[0]-wx:by[1]+wx, bx[0]-wy:bx[1]+wy]
-            plt_p = np.hstack((left, right, top, btm))
-            plt_p[0,:] -= bx[0]-wx
-            plt_p[1,:] -= by[0]-wy     
-            for i in range(plt_p.shape[1]):
-                plotcxy(plt_p[0,i], plt_p[1,i], color="Red", linewidth=2)
+            pwx, pwy = wx * 4, wy * 4
+            pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)
+                        ], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
+            plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
             plt.imshow(plt_g, 'gray'), plt.title(img_name)
+            plotbxy(bx-pbx[0], by-pby[0])
+
+            for i in range(patch.shape[0]):
+                plotbxy(patch[i, 0]-pbx[0], patch[i, 1]-pby[0], color="Red")
+
+            plt_p = np.hstack((lft, rht, top, btm))
+            plt_p[0, :] -= pbx[0]
+            plt_p[1, :] -= pby[0]
+            for i in range(plt_p.shape[1]):
+                plotcxy(plt_p[0, i], plt_p[1, i], color="lime", linewidth=2)
             plt.show()
 
     else:
