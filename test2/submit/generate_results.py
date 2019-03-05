@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 import math
 import time
 from scipy.ndimage import maximum_filter1d
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, medfilt
 
 
 def ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues = False):
@@ -582,7 +582,7 @@ def find_gate_edge(ax, ay, rx, ry, rw, img_g, axis, posdir, gray, img_name= None
     ax,ay   : Anchor cordinates
     rx, ry  : Search Roi, tuples with min, max cordinats for x & y
     img_g   : 1st image to find histogram peak of gate edge
-    rw      : max with of scafolding (if visable)
+    rw      : max with of gate + scafolding (if visable)
     """
     if 0 == axis:
         rp = ax
@@ -590,22 +590,55 @@ def find_gate_edge(ax, ay, rx, ry, rw, img_g, axis, posdir, gray, img_name= None
         rp = ay
     rx = [max(0, rx[0]), min(img_g.shape[1], rx[1])]
     ry = [max(0, ry[0]), min(img_g.shape[0], ry[1])]
-    hst_r = img_g[ry[0]:ry[1], rx[0]:rx[1]]
-    sum_r = np.sum(hst_r, axis=axis)
-    # plt.plot(sum_r), plt.show()
-    #print( max(sum_r), max(sum_r) / 3,  np.average(sum_r))
-    height = np.average(sum_r)
-    peakinfo = find_peaks(sum_r, height=height)
-    peaks = peakinfo[0]
-    if 0 < peaks.size:
-        # filter out small peaks
-        pmin = np.average(sum_r[peaks]) / 3
-        peaks = peaks[pmin < sum_r[peaks]]
-        if posdir:
-            rp = peaks[peaks.size -1]
-        else:
-            rp = peaks[0]
-    #plt.subplot(1,2,1), plt.plot(sum_r), plt.subplot(1,2,2), plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
+####//
+    #if True:
+    if False:
+        hst_g = gray[ry[0]:ry[1], rx[0]:rx[1]]
+        sum_g = np.sum(hst_g, axis=axis)
+        sum_g = medfilt(sum_g, 5)
+        height = np.average(sum_g)
+        plt.plot(sum_g), plt.show()
+        #peakinfo = find_peaks(sum_r, height=height)
+        peakinfo = find_peaks(sum_g, height=height, distance=rw//4)
+        peaks = peakinfo[0]
+        if 0 < peaks.size:
+            if posdir:
+                rp = peaks[peaks.size -1]
+            else:
+                rp = peaks[0]    
+####//
+    #if False:
+    if True:
+        hst_r = img_g[ry[0]:ry[1], rx[0]:rx[1]]
+        sum_r = np.sum(hst_r, axis=axis)
+        # plt.plot(sum_r), plt.show()
+        #print( max(sum_r), max(sum_r) / 3,  np.average(sum_r))
+        height = np.average(sum_r) * 2
+        peakinfo = find_peaks(sum_r, height=height)
+        peaks = peakinfo[0]
+        if 0 < peaks.size:
+            if 1 < peaks.size:
+                # Find outer most peak on the other side and then
+                # make sure we don't select a peak that exceeds the max width
+                if posdir:
+                    r0 = peaks[0]
+                    pw = peaks[peaks < r0 + rw*1.2]
+                else:
+                    r0 = peaks[peaks.size -1]
+                    pw = peaks[r0 < peaks + rw*1.2]
+                ### test ##//
+                if pw.size < peaks.size:
+                    plt.plot(sum_r), plt.show()
+                    peaks = pw
+                ### test
+            # filter out small peaks
+            pmin = np.average(sum_r[peaks]) / 3
+            peaks = peaks[pmin < sum_r[peaks]]
+            if posdir:
+                rp = peaks[peaks.size -1]
+            else:
+                rp = peaks[0]    
+        #plt.subplot(1,2,1), plt.plot(sum_r), plt.subplot(1,2,2), plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
 
     if 0 == axis:
         ex, ey = rx[0] + rp, ay
@@ -680,7 +713,7 @@ def my_prediction(img, img_name= None):
     ### Find the exact gate corner positions by analyzing the sobel'd image
     # Gate dim: inside = 8, out = 11 ->  width/2 = 3/2 * /((8+11)/2) = 3/19
     dx, dy = (bx[1] - bx[0])/2.0 , (by[1] - by[0])/2.0 
-    wx, wy = int(dx * 3 / 19), int(dy * 3 / 19)  # Gate width
+    wx, wy = 1+int(dx * 3 / 19), 1+int(dy * 3 / 19)  # Gate width/2
     # estimate projected (scafolding width = 1)
     if dx < dy:
         cosa = dx / dy
@@ -696,9 +729,9 @@ def my_prediction(img, img_name= None):
         img_dx = np.add(img_dxNeg, img_dxPos)
         img_dy = np.add(img_dyNeg, img_dyPos)
 
-        wx, wy = wx//2, wy//2
-        vwxn,vwxp, vwy = 2*wx,5*wx+wsx,wy # left,Right edge (neg and pos) vwxn,vwxp=, vwy= vertical range
-        hwyn,hwyp, hwx = 3*wy,5*wy+wsy,wx # top,bottom edge (neg and pos) hwyn,hwyp=, hwx= horizonal range
+        wx4, wy4 = wx//2, wy//2
+        vwxn,vwxp, vwy = 5*wx4,5*wx4+wsx,wy4 # left,Right edge (neg and pos) vwxn,vwxp, vwy= vertical range
+        hwyn,hwyp, hwx = 5*wy4,5*wy4+wsy,wx4 # top,bottom edge (neg and pos) hwyn,hwyp, hwx= horizonal range
         lft = np.array([ [bx[0]    , bx[0], bx[0]]     , [by[0]+hwyp, cy   , by[1]-hwyp] ])
         rht = np.array([ [bx[1]    , bx[1], bx[1]]     , [by[0]+hwyp, cy   , by[1]-hwyp] ])
         top = np.array([[bx[0]+vwxp, cx, bx[1]-+vwxp], [by[0], by[0], by[0]]])
@@ -737,26 +770,31 @@ def my_prediction(img, img_name= None):
                 plotcxy(plt_p[0, i], plt_p[1, i], color="Red", linewidth=2)
             plt.show()
 
-
+##########//
+        side = 1  # 0=left, 1=right, 2=top, 3=bottom
+        for sn in range(0, 3):   # 0,1,2 patch within a side
+            pn = 3*side + sn       # patch number
+            rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], vwxp+wsx, img_dx, axis=0, posdir=False, gray=gray, img_name=img_name)
+##########//
         side = 0  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            lft[0,sn], lft[1,sn] = find_gate_edge(lft[0,sn], lft[1,sn], patch[pn,0], patch[pn,1], wx, img_dx, axis=0, posdir=True, gray=gray, img_name=img_name)
+            lft[0,sn], lft[1,sn] = find_gate_edge(lft[0,sn], lft[1,sn], patch[pn,0], patch[pn,1], vwxp+wsx, img_dx, axis=0, posdir=True, gray=gray, img_name=img_name)
 
         side = 1  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], wx, img_dx, axis=0, posdir=False, gray=gray, img_name=img_name)
+            rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], vwxp+wsx, img_dx, axis=0, posdir=False, gray=gray, img_name=img_name)
 
         side = 2  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            top[0,sn], top[1,sn] = find_gate_edge(top[0,sn], top[1,sn], patch[pn,0], patch[pn,1], wy, img_dy, axis=1, posdir=True, gray=gray, img_name=img_name)
+            top[0,sn], top[1,sn] = find_gate_edge(top[0,sn], top[1,sn], patch[pn,0], patch[pn,1], hwyp+wsy, img_dy, axis=1, posdir=True, gray=gray, img_name=img_name)
 
         side = 3  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            btm[0,sn], btm[1,sn] = find_gate_edge(btm[0,sn], btm[1,sn], patch[pn,0], patch[pn,1], wy, img_dy, axis=1, posdir=False, gray=gray, img_name=img_name)
+            btm[0,sn], btm[1,sn] = find_gate_edge(btm[0,sn], btm[1,sn], patch[pn,0], patch[pn,1], hwyp+wsy, img_dy, axis=1, posdir=False, gray=gray, img_name=img_name)
 
         lft_l = linefit3(lft[1], lft[0]) # x = ay + b
         rht_l = linefit3(rht[1], rht[0])
