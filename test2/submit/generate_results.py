@@ -584,40 +584,29 @@ def find_gate_edge(ax, ay, rx, ry, rw, img_g, axis, posdir, gray, img_name= None
     img_g   : 1st image to find histogram peak of gate edge
     rw      : max with of scafolding (if visable)
     """
-    #rg = Edge pos & improvements: 0=Initial ROI, 1=Edge corection, 2=Scafolding corection
     if 0 == axis:
-        rg = [ [rx[0], rx[0], ax], [ax-rx[0], 0, 0]  ]
         rp = ax
     else:
-        rg = [ [ry[0], ry[0], ay], [ay-ry[0], 0, 0]  ]
         rp = ay
+    rx = [max(0, rx[0]), min(img_g.shape[1], rx[1])]
+    ry = [max(0, ry[0]), min(img_g.shape[0], ry[1])]
     hst_r = img_g[ry[0]:ry[1], rx[0]:rx[1]]
-    sum_r = np.sum(hst_r, axis=axis)    
-    # plt.plot(sum_r), plt.show()    
-    peakinfo = find_peaks(sum_r, height=max(sum_r)/3, distance=rw/3, prominence=1)
-    #threshold = hst_r.shape[axis]*5
-    #peakinfo = find_peaks(sum_r, threshold=threshold, distance=rw/3, prominence=1)
-    peaks, psrt = peakinfo[0], np.argsort(peakinfo[1]['prominences'])
+    sum_r = np.sum(hst_r, axis=axis)
+    # plt.plot(sum_r), plt.show()
+    #print( max(sum_r), max(sum_r) / 3,  np.average(sum_r))
+    height = np.average(sum_r)
+    peakinfo = find_peaks(sum_r, height=height)
+    peaks = peakinfo[0]
     if 0 < peaks.size:
+        # filter out small peaks
+        pmin = np.average(sum_r[peaks]) / 3
+        peaks = peaks[pmin < sum_r[peaks]]
         if posdir:
             rp = peaks[peaks.size -1]
         else:
             rp = peaks[0]
-    if False:
-        peaks, psrt = peakinfo[0], np.argsort(peakinfo[1]['prominences'])
-        if 0 < peaks.size:
-            peaks = peaks[psrt[::-1]] # Peaks sorted in decreasing prominance order
-            if 1 < peaks.size:   # Pick the one further in wanted direction
-                if posdir:
-                    rp = max(peaks[0:2])
-                else:
-                    rp = min(peaks[0:2])
-            else:
-                rp = peaks[0]
-    # plotbxy(rx,ry), plt.imshow(gray, 'gray'), plt.title(img_name), plt.show()
-    # plt.subplot(1, 2, 1), plt.plot(sum_r), plt.subplot(1, 2, 2),  plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
-        
-        
+    #plt.subplot(1,2,1), plt.plot(sum_r), plt.subplot(1,2,2), plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
+
     if 0 == axis:
         ex, ey = rx[0] + rp, ay
     else:
@@ -690,17 +679,26 @@ def my_prediction(img, img_name= None):
     ####### TODO #######
     ### Find the exact gate corner positions by analyzing the sobel'd image
     # Gate dim: inside = 8, out = 11 ->  width/2 = 3/2 * /((8+11)/2) = 3/19
-    gx, gy = bx, by
     dx, dy = (bx[1] - bx[0])/2.0 , (by[1] - by[0])/2.0 
-    wx, wy = int(dx *3/19), int(dy*3/19)    # Gate width
+    wx, wy = int(dx * 3 / 19), int(dy * 3 / 19)  # Gate width
+    # estimate projected (scafolding width = 1)
+    if dx < dy:
+        cosa = dx / dy
+        wsx = int(dy / 9 * (1 - (cosa ** 2) / 2))
+        wsy = int(wsx/4)
+    else:
+        cosa = dy / dx
+        wsy = int(dx / 9 * (1 - (cosa ** 2) / 2))
+        wsx = int(wsy/4)
     # Sanity check
+#    if False: This step takes an extra 20 ms
     if 4 < wx and 4 < wy:
         img_dx = np.add(img_dxNeg, img_dxPos)
         img_dy = np.add(img_dyNeg, img_dyPos)
 
         wx, wy = wx//2, wy//2
-        vwxn,vwxp, vwy = 2*wx,5*wx,wy # left,Right edge (neg and pos) vwxn,vwxp=, vwy= vertical range
-        hwyn,hwyp, hwx = 2*wy,5*wy,wx # top,bottom edge (neg and pos) hwyn,hwyp=, hwx= horizonal range
+        vwxn,vwxp, vwy = 2*wx,5*wx+wsx,wy # left,Right edge (neg and pos) vwxn,vwxp=, vwy= vertical range
+        hwyn,hwyp, hwx = 3*wy,5*wy+wsy,wx # top,bottom edge (neg and pos) hwyn,hwyp=, hwx= horizonal range
         lft = np.array([ [bx[0]    , bx[0], bx[0]]     , [by[0]+hwyp, cy   , by[1]-hwyp] ])
         rht = np.array([ [bx[1]    , bx[1], bx[1]]     , [by[0]+hwyp, cy   , by[1]-hwyp] ])
         top = np.array([[bx[0]+vwxp, cx, bx[1]-+vwxp], [by[0], by[0], by[0]]])
@@ -739,6 +737,7 @@ def my_prediction(img, img_name= None):
                 plotcxy(plt_p[0, i], plt_p[1, i], color="Red", linewidth=2)
             plt.show()
 
+
         side = 0  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
@@ -759,14 +758,24 @@ def my_prediction(img, img_name= None):
             pn = 3*side + sn       # patch number
             btm[0,sn], btm[1,sn] = find_gate_edge(btm[0,sn], btm[1,sn], patch[pn,0], patch[pn,1], wy, img_dy, axis=1, posdir=False, gray=gray, img_name=img_name)
 
+        lft_l = linefit3(lft[1], lft[0]) # x = ay + b
+        rht_l = linefit3(rht[1], rht[0])
+        top_l = linefit3(top[0], top[1]) # y = ax + b
+        btm_l = linefit3(btm[0], btm[1])
+        g1 = line_intersection(top_l, lft_l)
+        g2 = line_intersection(top_l, rht_l)
+        g3 = line_intersection(btm_l, rht_l)
+        g4 = line_intersection(btm_l, lft_l)
+        bb = np.array([g1, g2, g3, g4])
+
+##xx        if False:
         if True:
             pwx, pwy = wx * 4, wy * 4
-            pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)
-                        ], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
+            pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
             plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
             plt.imshow(plt_g, 'gray'), plt.title(img_name)
-            plotbxy(bx-pbx[0], by-pby[0])
-
+            plotbxy(bx - pbx[0], by - pby[0])
+            
             for i in range(patch.shape[0]):
                 plotbxy(patch[i, 0]-pbx[0], patch[i, 1]-pby[0], color="Red")
 
@@ -775,23 +784,46 @@ def my_prediction(img, img_name= None):
             plt_p[1, :] -= pby[0]
             for i in range(plt_p.shape[1]):
                 plotcxy(plt_p[0, i], plt_p[1, i], color="lime", linewidth=2)
+
+            # The final gate coord
+            plt_x, plt_y = bb[:, 0] - pbx[0], bb[:, 1] - pby[0]
+            plt_x, plt_y = np.append(plt_x, plt_x[0]), np.append(plt_y, plt_y[0])
+            plt.plot(plt_x, plt_y, color="lime", linewidth=2)
             plt.show()
 
     else:
-        gx, gy = by, by
-        print("TODO: Just use the ROI ##//")
-
+        bb = np.array([ [bx[0], by[0]], [bx[1], by[0]], [bx[1], by[1]], [bx[0], by[1]] ])
+        #print("TODO: Just use the ROI ##//")
     ####### TODO #######
 
 ##xx    dbg_show = True
     dbg_show = False
     if dbg_show:
-        plotbxy(gx,gy)
         plt.imshow(gray, 'gray'), plt.title(img_name)
+        # The final gate coord
+        plt_x, plt_y = bb[:, 0], bb[:, 1]
+        plt_x, plt_y = np.append(plt_x, plt_x[0]), np.append(plt_y, plt_y[0])
+        plt.plot(plt_x, plt_y, color="lime", linewidth=2)
         plt.show()
-
-    bb = np.array([ [bx[0], by[0]], [bx[1], by[0]], [bx[1], by[1]], [bx[0], by[1]] ])
     return bb
+
+def linefit3(ax, ay, sensitivity=0.8):
+    """
+    Args: ax=[x0,x1,x2] (3 equally spaced independent variables)
+          ay=[y0,y1,y2]
+    """
+    m = (ay[2] - ay[0]) / (ax[2] - ax[0]) * sensitivity
+    return [m, sum(ay)/3 - m* sum(ax)/3]
+
+
+def line_intersection(ly, lx):
+    """
+    Args: lx=[ax, bx], ly=[ay, by]  
+    Horz line equ: y = ax*x + bx
+    Vert line equ: x = ay*y + by
+    """
+    det = 1 - lx[0] * ly[0]
+    return [(lx[0]*ly[1] +lx[1])/det, (ly[0]*lx[1] +ly[1])/det]
 
 
 class GenerateFinalDetections():
