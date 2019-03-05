@@ -576,7 +576,7 @@ def find_gate_roi(gray, img_name= None):
     return gx, gy, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
 
 
-def find_gate_edge(ax, ay, rx, ry, rw, img_g, axis, posdir, gray, img_name= None):
+def find_gate_edge(ax, ay, rx, ry, rw, img_p, img_n, axis, posdir, gray, img_name= None):
     """
     Find the max peak = gate edge
     ax,ay   : Anchor cordinates
@@ -588,58 +588,54 @@ def find_gate_edge(ax, ay, rx, ry, rw, img_g, axis, posdir, gray, img_name= None
         rp = ax
     else:
         rp = ay
-    rx = [max(0, rx[0]), min(img_g.shape[1], rx[1])]
-    ry = [max(0, ry[0]), min(img_g.shape[0], ry[1])]
-####//
-    #if True:
-    if False:
-        hst_g = gray[ry[0]:ry[1], rx[0]:rx[1]]
-        sum_g = np.sum(hst_g, axis=axis)
-        sum_g = medfilt(sum_g, 5)
-        height = np.average(sum_g)
-        plt.plot(sum_g), plt.show()
-        #peakinfo = find_peaks(sum_r, height=height)
-        peakinfo = find_peaks(sum_g, height=height, distance=rw//4)
-        peaks = peakinfo[0]
-        if 0 < peaks.size:
-            if posdir:
-                rp = peaks[peaks.size -1]
-            else:
-                rp = peaks[0]    
-####//
-    #if False:
-    if True:
-        hst_r = img_g[ry[0]:ry[1], rx[0]:rx[1]]
-        sum_r = np.sum(hst_r, axis=axis)
-        # plt.plot(sum_r), plt.show()
-        #print( max(sum_r), max(sum_r) / 3,  np.average(sum_r))
-        height = np.average(sum_r) * 2
-        peakinfo = find_peaks(sum_r, height=height)
-        peaks = peakinfo[0]
-        if 0 < peaks.size:
-            if 1 < peaks.size:
-                # Find outer most peak on the other side and then
-                # make sure we don't select a peak that exceeds the max width
-                if posdir:
-                    r0 = peaks[0]
-                    pw = peaks[peaks < r0 + rw*1.2]
-                else:
-                    r0 = peaks[peaks.size -1]
-                    pw = peaks[r0 < peaks + rw*1.2]
-                ### test ##//
-                if pw.size < peaks.size:
-                    plt.plot(sum_r), plt.show()
-                    peaks = pw
-                ### test
-            # filter out small peaks
-            pmin = np.average(sum_r[peaks]) / 3
-            peaks = peaks[pmin < sum_r[peaks]]
-            if posdir:
-                rp = peaks[peaks.size -1]
-            else:
-                rp = peaks[0]    
-        #plt.subplot(1,2,1), plt.plot(sum_r), plt.subplot(1,2,2), plt.imshow(hst_r, 'gray'), plt.title(img_name), plt.show()
+    rx = [max(0, rx[0]), min(img_p.shape[1], rx[1])]
+    ry = [max(0, ry[0]), min(img_p.shape[0], ry[1])]
 
+    hst_p = img_p[ry[0]:ry[1], rx[0]:rx[1]]
+    sum_p = np.sum(hst_p, axis=axis)
+    hgt_p = np.average(sum_p)*2
+    pinf_p = find_peaks(sum_p, height=hgt_p, prominence=1)
+    peak_p, psrt_p = pinf_p[0], pinf_p[1]['prominences']
+
+    hst_n = img_n[ry[0]:ry[1], rx[0]:rx[1]]
+    sum_n = np.sum(hst_n, axis=axis)
+    hgt_n = np.average(sum_n)*2
+    pinf_n = find_peaks(sum_n, height=hgt_n, prominence=1)
+    peak_n, psrt_n = pinf_n[0], pinf_n[1]['prominences']
+
+    avg_p = np.sum(np.multiply(peak_p, sum_p[peak_p])) + np.sum(np.multiply(peak_n, sum_n[peak_n]))
+    avg_p = avg_p / ( np.sum(sum_p[peak_p]) + np.sum(sum_n[peak_n]) )
+    p0 = int(avg_p) # we might need it later
+    if posdir:
+        if 0 < peak_p.size:
+            p0 = peak_p[peak_p.size-1] 
+        peak_p = peak_p[avg_p <= peak_p]
+        psrt_p = psrt_p[-peak_p.size:]
+    else:
+        if 0 < peak_p.size:
+            p0 = peak_p[0]
+        peak_p = peak_p[peak_p <= avg_p]
+        psrt_p = psrt_p[:peak_p.size]
+
+    if 0 < peak_p.size:
+        max_p = np.argsort(psrt_p)[psrt_p.size-1]
+        rp = peak_p[max_p]
+    else: # special case where the intensity change at the edge is inverted 
+        max_n = np.argsort(psrt_n)[psrt_n.size-1]
+        rn = peak_n[max_n]
+        if posdir:
+            if 2* sum_n[rn] < sum_p[p0] or rn < p0:
+                rp = p0
+            else:
+                rp = rn
+        else:
+            if 2* sum_n[rn] < sum_p[p0] or p0 < rn:
+                rp = p0
+            else:
+                rp = rn
+
+    #plt.subplot(2,1,1), plt.plot(sum_p), plt.subplot(2,1,2), plt.plot(sum_n), plt.show()
+    #plt.plot(sum_p), plt.show()
     if 0 == axis:
         ex, ey = rx[0] + rp, ay
     else:
@@ -726,14 +722,16 @@ def my_prediction(img, img_name= None):
     # Sanity check
 #    if False: This step takes an extra 20 ms
     if 4 < wx and 4 < wy:
-        img_dx = np.add(img_dxNeg, img_dxPos)
-        img_dy = np.add(img_dyNeg, img_dyPos)
+        ##//img_dx = np.add(img_dxNeg, img_dxPos)
+        ##//img_dy = np.add(img_dyNeg, img_dyPos)
 
         wx4, wy4 = wx//2, wy//2
-        vwxn,vwxp, vwy = 5*wx4,5*wx4+wsx,wy4 # left,Right edge (neg and pos) vwxn,vwxp, vwy= vertical range
-        hwyn,hwyp, hwx = 5*wy4,5*wy4+wsy,wx4 # top,bottom edge (neg and pos) hwyn,hwyp, hwx= horizonal range
+        vwxn,vwxp, vwy = 3*wx4,5*wx4+wsx,wy4 # left,Right edge (neg and pos) vwxn,vwxp, vwy= vertical range
+        hwyn,hwyp, hwx = 3*wy4,5*wy4+wsy,wx4 # top,bottom edge (neg and pos) hwyn,hwyp, hwx= horizonal range
         lft = np.array([ [bx[0]    , bx[0], bx[0]]     , [by[0]+hwyp, cy   , by[1]-hwyp] ])
         rht = np.array([ [bx[1]    , bx[1], bx[1]]     , [by[0]+hwyp, cy   , by[1]-hwyp] ])
+##//        lft = np.array([ [bx[0]    , bx[0], bx[0]]     , [by[0]+2*wy, cy   , by[1]-2*wy] ])
+##//        rht = np.array([ [bx[1]    , bx[1], bx[1]]     , [by[0]+2*wy, cy   , by[1]-2*wy] ])
         top = np.array([[bx[0]+vwxp, cx, bx[1]-+vwxp], [by[0], by[0], by[0]]])
         btm = np.array([[bx[0]+vwxp, cx, bx[1]-+vwxp], [by[1], by[1], by[1]]])
 
@@ -771,30 +769,26 @@ def my_prediction(img, img_name= None):
             plt.show()
 
 ##########//
-        side = 1  # 0=left, 1=right, 2=top, 3=bottom
-        for sn in range(0, 3):   # 0,1,2 patch within a side
-            pn = 3*side + sn       # patch number
-            rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], vwxp+wsx, img_dx, axis=0, posdir=False, gray=gray, img_name=img_name)
 ##########//
         side = 0  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            lft[0,sn], lft[1,sn] = find_gate_edge(lft[0,sn], lft[1,sn], patch[pn,0], patch[pn,1], vwxp+wsx, img_dx, axis=0, posdir=True, gray=gray, img_name=img_name)
+            lft[0,sn], lft[1,sn] = find_gate_edge(lft[0,sn], lft[1,sn], patch[pn,0], patch[pn,1], vwxp+wsx, img_dxNeg, img_dxPos, axis=0, posdir=True, gray=gray, img_name=img_name)
 
         side = 1  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], vwxp+wsx, img_dx, axis=0, posdir=False, gray=gray, img_name=img_name)
+            rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], vwxp+wsx, img_dxPos, img_dxNeg, axis=0, posdir=False, gray=gray, img_name=img_name)
 
         side = 2  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            top[0,sn], top[1,sn] = find_gate_edge(top[0,sn], top[1,sn], patch[pn,0], patch[pn,1], hwyp+wsy, img_dy, axis=1, posdir=True, gray=gray, img_name=img_name)
+            top[0,sn], top[1,sn] = find_gate_edge(top[0,sn], top[1,sn], patch[pn,0], patch[pn,1], hwyp+wsy, img_dyNeg, img_dyPos, axis=1, posdir=True, gray=gray, img_name=img_name)
 
         side = 3  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            btm[0,sn], btm[1,sn] = find_gate_edge(btm[0,sn], btm[1,sn], patch[pn,0], patch[pn,1], hwyp+wsy, img_dy, axis=1, posdir=False, gray=gray, img_name=img_name)
+            btm[0,sn], btm[1,sn] = find_gate_edge(btm[0,sn], btm[1,sn], patch[pn,0], patch[pn,1], hwyp+wsy, img_dyPos, img_dyNeg, axis=1, posdir=False, gray=gray, img_name=img_name)
 
         lft_l = linefit3(lft[1], lft[0]) # x = ay + b
         rht_l = linefit3(rht[1], rht[0])
@@ -806,7 +800,7 @@ def my_prediction(img, img_name= None):
         g4 = line_intersection(btm_l, lft_l)
         bb = np.array([g1, g2, g3, g4])
 
-##xx        if False:
+#        if False:
         if True:
             pwx, pwy = wx * 4, wy * 4
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
