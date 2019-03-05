@@ -581,13 +581,18 @@ def find_gate_edge(ax, ay, rx, ry, rw, img_p, img_n, axis, posdir, gray, img_nam
     Find the max peak = gate edge
     ax,ay   : Anchor cordinates
     rx, ry  : Search Roi, tuples with min, max cordinats for x & y
-    img_g   : 1st image to find histogram peak of gate edge
     rw      : max with of gate + scafolding (if visable)
+    img_p   : 1st image to find histogram peak of gate edge
+              We assume that the light at the inner gate edges is captured on the posdir side,
+              and it will cause a large peak at the end of the roi
+    img_n   : This image is used to find the avg position of the all peaks
+              which ~ the center of the gate edge
+    posdir  : True when searching from left to right
     """
     if 0 == axis:
-        rp = ax
+        rp = ax - rx[0]
     else:
-        rp = ay
+        rp = ay - ry[0]
     rx = [max(0, rx[0]), min(img_p.shape[1], rx[1])]
     ry = [max(0, ry[0]), min(img_p.shape[0], ry[1])]
 
@@ -602,40 +607,49 @@ def find_gate_edge(ax, ay, rx, ry, rw, img_p, img_n, axis, posdir, gray, img_nam
     hgt_n = np.average(sum_n)*2
     pinf_n = find_peaks(sum_n, height=hgt_n, prominence=1)
     peak_n, psrt_n = pinf_n[0], pinf_n[1]['prominences']
-
-    avg_p = np.sum(np.multiply(peak_p, sum_p[peak_p])) + np.sum(np.multiply(peak_n, sum_n[peak_n]))
-    avg_p = avg_p / ( np.sum(sum_p[peak_p]) + np.sum(sum_n[peak_n]) )
-    p0 = int(avg_p) # we might need it later
-    if posdir:
-        if 0 < peak_p.size:
-            p0 = peak_p[peak_p.size-1] 
-        peak_p = peak_p[avg_p <= peak_p]
-        psrt_p = psrt_p[-peak_p.size:]
-    else:
-        if 0 < peak_p.size:
-            p0 = peak_p[0]
-        peak_p = peak_p[peak_p <= avg_p]
-        psrt_p = psrt_p[:peak_p.size]
-
-    if 0 < peak_p.size:
-        max_p = np.argsort(psrt_p)[psrt_p.size-1]
-        rp = peak_p[max_p]
-    else: # special case where the intensity change at the edge is inverted 
-        max_n = np.argsort(psrt_n)[psrt_n.size-1]
-        rn = peak_n[max_n]
+    
+    # plt.subplot(2,2,1), plt.plot(sum_p)  , plt.subplot(2,2,2), plt.plot(sum_n) #plt.show()
+    # plt.subplot(2,2,3), plt.imshow(hst_p), plt.subplot(2,2,4), plt.imshow(hst_n), plt.show()
+    avg_p = cum_p = 0
+    if 0 < peak_p.size:   
+        avg_p = np.sum(np.multiply(peak_p, sum_p[peak_p]))
+        cum_p = np.sum(sum_p[peak_p])
+    if 0 < peak_n.size:   
+        avg_p = np.sum(np.multiply(peak_n, sum_n[peak_n]))
+        cum_p = np.sum(sum_n[peak_n])
+    if 0 < cum_p:
+        avg_p /= cum_p
         if posdir:
-            if 2* sum_n[rn] < sum_p[p0] or rn < p0:
-                rp = p0
-            else:
-                rp = rn
+            peak_p = peak_p[avg_p <= peak_p]
+            psrt_p = psrt_p[-peak_p.size:]
+            peak_n = peak_n[avg_p <= peak_n]
+            psrt_n = psrt_n[-peak_n.size:]
         else:
-            if 2* sum_n[rn] < sum_p[p0] or p0 < rn:
-                rp = p0
-            else:
-                rp = rn
+            peak_p = peak_p[peak_p <= avg_p]
+            psrt_p = psrt_p[:peak_p.size]
+            peak_n = peak_n[peak_n <= avg_p]
+            psrt_n = psrt_n[:peak_n.size]
 
-    #plt.subplot(2,1,1), plt.plot(sum_p), plt.subplot(2,1,2), plt.plot(sum_n), plt.show()
-    #plt.plot(sum_p), plt.show()
+        max_n = max_p = int(avg_p)
+        if 0 < peak_n.size:
+            idx_n = np.argsort(psrt_n)[psrt_n.size-1]
+            max_n = peak_n[idx_n]
+        if 0 < peak_p.size:
+            idx_p = np.argsort(psrt_p)[psrt_p.size-1]
+            max_p = peak_p[idx_p]
+        if posdir:
+            if max_p < max_n and sum_p[max_p] < 2*sum_n[max_n]:
+                rp = max_n
+            else:
+                rp = max_p
+        else:
+            if max_n < max_p and sum_p[max_p] < 2*sum_n[max_n]:
+                rp = max_n
+            else:
+                rp = max_p
+
+    # plt.subplot(2,1,1), plt.plot(sum_p), plt.subplot(2,1,2), plt.plot(sum_n), plt.show()
+    # plt.plot(sum_p), plt.show()
     if 0 == axis:
         ex, ey = rx[0] + rp, ay
     else:
@@ -705,35 +719,45 @@ def my_prediction(img, img_name= None):
         ax[5].imshow(img_dxy, 'gray'), ax[4].set_title("+dY Sobel "+ img_name)
         plt.show()
 
-    ####### TODO #######
+    
     ### Find the exact gate corner positions by analyzing the sobel'd image
     # Gate dim: inside = 8, out = 11 ->  width/2 = 3/2 * /((8+11)/2) = 3/19
     dx, dy = (bx[1] - bx[0])/2.0 , (by[1] - by[0])/2.0 
     wx, wy = 1+int(dx * 3 / 19), 1+int(dy * 3 / 19)  # Gate width/2
-    # estimate projected (scafolding width = 1)
-    if dx < dy:
-        cosa = dx / dy
-        wsx = int(dy / 9 * (1 - (cosa ** 2) / 2))
-        wsy = int(wsx/4)
-    else:
-        cosa = dy / dx
-        wsy = int(dx / 9 * (1 - (cosa ** 2) / 2))
-        wsx = int(wsy/4)
-    # Sanity check
-#    if False: This step takes an extra 20 ms
-    if 4 < wx and 4 < wy:
+
+#    if False: #This step takes an extra 20 ms    
+    if 3 < wx and 3 < wy: # Sanity check
         ##//img_dx = np.add(img_dxNeg, img_dxPos)
         ##//img_dy = np.add(img_dyNeg, img_dyPos)
 
+        # estimate projected (scafolding width = 1)
+        if dx < dy:
+            cosa = dx / dy
+            wsx = int(dy / 9 * (1 - (cosa ** 2) / 2))
+            wsy = int(wsx/4)
+        else:
+            cosa = dy / dx
+            wsy = int(dx / 9 * (1 - (cosa ** 2) / 2))
+            wsx = int(wsy/4)
         wx4, wy4 = wx//2, wy//2
-        vwxn,vwxp, vwy = 3*wx4,5*wx4+wsx,wy4 # left,Right edge (neg and pos) vwxn,vwxp, vwy= vertical range
-        hwyn,hwyp, hwx = 3*wy4,5*wy4+wsy,wx4 # top,bottom edge (neg and pos) hwyn,hwyp, hwx= horizonal range
-        lft = np.array([ [bx[0]    , bx[0], bx[0]]     , [by[0]+hwyp, cy   , by[1]-hwyp] ])
-        rht = np.array([ [bx[1]    , bx[1], bx[1]]     , [by[0]+hwyp, cy   , by[1]-hwyp] ])
-##//        lft = np.array([ [bx[0]    , bx[0], bx[0]]     , [by[0]+2*wy, cy   , by[1]-2*wy] ])
-##//        rht = np.array([ [bx[1]    , bx[1], bx[1]]     , [by[0]+2*wy, cy   , by[1]-2*wy] ])
-        top = np.array([[bx[0]+vwxp, cx, bx[1]-+vwxp], [by[0], by[0], by[0]]])
-        btm = np.array([[bx[0]+vwxp, cx, bx[1]-+vwxp], [by[1], by[1], by[1]]])
+        gwx, gwy = 2*wx + wsx,  2*wy + wsy   # Max search length=  gate width + scafolding
+        vwxn,vwxp, vwy = 3*wx4,5*wx4+wsx,wy4 # -vwxn,+vwxp roi width added to anchor, vwy= +/-vertical range
+        hwyn,hwyp, hwx = 3*wy4,5*wy4+wsy,wx4 # -hwyn,+hwyp roi hight added to anchor, hwx= +/-horizonal range
+
+        # The gate positions is only accurate to pixelsPerBin=20 from find_gate_roi()
+#        if False:
+        if True:
+            w4_pixelsPerBin=5 #20/4        
+            if wx4 < w4_pixelsPerBin:
+                vwxn,vwxp = 6 * w4_pixelsPerBin, 5 * w4_pixelsPerBin
+            if wy4 < w4_pixelsPerBin:
+                hwyn,hwyp = 6 * w4_pixelsPerBin, 5 * w4_pixelsPerBin
+
+        dcx, dcy = 5*wx4, 5*wy4 # anchor placement of search roi's along the edge
+        lft = np.array([ [bx[0]    , bx[0], bx[0]]     , [by[0]+dcy, cy   , by[1]-dcy] ])
+        rht = np.array([ [bx[1]    , bx[1], bx[1]]     , [by[0]+dcy, cy   , by[1]-dcy] ])
+        top = np.array([[bx[0]+dcx, cx, bx[1]-+dcx], [by[0], by[0], by[0]]])
+        btm = np.array([[bx[0]+dcx, cx, bx[1]-+dcx], [by[1], by[1], by[1]]])
 
         patch = np.array([
             [[lft[0,0] - vwxn, lft[0,0] + vwxp], [lft[1,0] - vwy, lft[1,0] + vwy]],
@@ -747,11 +771,10 @@ def my_prediction(img, img_name= None):
             [[top[0,2] - hwx, top[0,2] + hwx], [top[1,2] - hwyn, top[1,2] + hwyp]],
             [[btm[0,0] - hwx, btm[0,0] + hwx], [btm[1,0] - hwyp, btm[1,0] + hwyn]],
             [[btm[0,1] - hwx, btm[0,1] + hwx], [btm[1,1] - hwyp, btm[1,1] + hwyn]],
-            [[btm[0,2] - hwx, btm[0,2] + hwx], [btm[1,2] - hwyp, btm[1,2] + hwyn]],
-            ])
+            [[btm[0,2] - hwx, btm[0,2] + hwx], [btm[1,2] - hwyp, btm[1,2] + hwyn]] ])
 
         if False:
-#        if True:
+##        if True:
             pwx, pwy = wx * 4, wy * 4
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
             plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
@@ -773,22 +796,22 @@ def my_prediction(img, img_name= None):
         side = 0  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            lft[0,sn], lft[1,sn] = find_gate_edge(lft[0,sn], lft[1,sn], patch[pn,0], patch[pn,1], vwxp+wsx, img_dxNeg, img_dxPos, axis=0, posdir=True, gray=gray, img_name=img_name)
+            lft[0,sn], lft[1,sn] = find_gate_edge(lft[0,sn], lft[1,sn], patch[pn,0], patch[pn,1], gwx, img_dxNeg, img_dxPos, axis=0, posdir=True, gray=gray, img_name=img_name)
 
         side = 1  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], vwxp+wsx, img_dxPos, img_dxNeg, axis=0, posdir=False, gray=gray, img_name=img_name)
+            rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], gwx, img_dxPos, img_dxNeg, axis=0, posdir=False, gray=gray, img_name=img_name)
 
         side = 2  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            top[0,sn], top[1,sn] = find_gate_edge(top[0,sn], top[1,sn], patch[pn,0], patch[pn,1], hwyp+wsy, img_dyNeg, img_dyPos, axis=1, posdir=True, gray=gray, img_name=img_name)
+            top[0,sn], top[1,sn] = find_gate_edge(top[0,sn], top[1,sn], patch[pn,0], patch[pn,1], gwy, img_dyNeg, img_dyPos, axis=1, posdir=True, gray=gray, img_name=img_name)
 
         side = 3  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 3):   # 0,1,2 patch within a side
             pn = 3*side + sn       # patch number
-            btm[0,sn], btm[1,sn] = find_gate_edge(btm[0,sn], btm[1,sn], patch[pn,0], patch[pn,1], hwyp+wsy, img_dyPos, img_dyNeg, axis=1, posdir=False, gray=gray, img_name=img_name)
+            btm[0,sn], btm[1,sn] = find_gate_edge(btm[0,sn], btm[1,sn], patch[pn,0], patch[pn,1], gwy, img_dyPos, img_dyNeg, axis=1, posdir=False, gray=gray, img_name=img_name)
 
         lft_l = linefit3(lft[1], lft[0]) # x = ay + b
         rht_l = linefit3(rht[1], rht[0])
@@ -800,8 +823,8 @@ def my_prediction(img, img_name= None):
         g4 = line_intersection(btm_l, lft_l)
         bb = np.array([g1, g2, g3, g4])
 
-#        if False:
-        if True:
+        if False:
+##        if True:
             pwx, pwy = wx * 4, wy * 4
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
             plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
@@ -824,9 +847,9 @@ def my_prediction(img, img_name= None):
             plt.show()
 
     else:
-        bb = np.array([ [bx[0], by[0]], [bx[1], by[0]], [bx[1], by[1]], [bx[0], by[1]] ])
         #print("TODO: Just use the ROI ##//")
-    ####### TODO #######
+        bb = np.array([ [bx[0], by[0]], [bx[1], by[0]], [bx[1], by[1]], [bx[0], by[1]] ])
+    ### Find the exact gate corner positions by analyzing the sobel'd image
 
 ##xx    dbg_show = True
     dbg_show = False
