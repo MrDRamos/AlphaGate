@@ -33,7 +33,7 @@ def UseTrainingImages(qty=20):
     #data_ofs = img_keys.index('IMG_0638.JPG')  # large + angle
 
     #data_ofs = img_keys.index('IMG_0664.JPG')  # large + angle
-    #data_ofs = img_keys.index('IMG_0711.JPG') # small + angle
+    data_ofs = img_keys.index('IMG_0711.JPG') # small + angle
     #data_ofs = img_keys.index('IMG_1625.JPG') # no gate, 492, 5199
 
     #data_ofs = img_keys.index('IMG_3574.JPG')

@@ -10,7 +10,8 @@ from matplotlib import pyplot as plt
 import math
 import time
 from scipy.ndimage import maximum_filter1d
-from scipy.signal import find_peaks, medfilt
+from scipy.signal import find_peaks
+from scipy import polyfit
 
 
 def ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues = False):
@@ -747,14 +748,29 @@ def my_prediction(img, img_name= None):
         # The gate positions is only accurate to pixelsPerBin=20 from find_gate_roi()
 #        if False:
         if True:
-            w4_pixelsPerBin=5 #20/4        
+            w4_pixelsPerBin=5 #20/4
+            if wx4 < w4_pixelsPerBin or wy4 < w4_pixelsPerBin:
+                pwx, pwy = w4_pixelsPerBin* 4, w4_pixelsPerBin * 4
+                pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
+                img_dx = np.add(img_dxNeg[pby[0]:pby[1], pbx[0]:pbx[1]], img_dxPos[pby[0]:pby[1], pbx[0]:pbx[1]])
+                img_dy = np.add(img_dyNeg[pby[0]:pby[1], pbx[0]:pbx[1]], img_dyPos[pby[0]:pby[1], pbx[0]:pbx[1]])
+                ##// img_d = np.add(img_dx, img_dy)
+                # plt.subplot(1, 2, 1), plt.imshow(img_dx), plt.subplot(1, 2, 2), plt.imshow(img_dy), plt.show()
+                sum_dx, sum_dy = np.sum(img_dy, axis=0), np.sum(img_dx, axis=1)
+                avg_x= np.average(np.arange(pbx[0],pbx[1]),weights=sum_dx)
+                avg_y= np.average(np.arange(pby[0],pby[1]),weights=sum_dy)
+                #avg_x += 10           
+                dcx, dcy = int(avg_x -cx+0.5), int(avg_y-cy+0.5)
+                bx, by = bx + dcx, by+ dcy
+                cx, cy = cx+ dcx, cy+dcy
+
             if wx4 < w4_pixelsPerBin:
                 vwxn,vwxp = 6 * w4_pixelsPerBin, 5 * w4_pixelsPerBin
             if wy4 < w4_pixelsPerBin:
                 hwyn,hwyp = 6 * w4_pixelsPerBin, 5 * w4_pixelsPerBin
 
         dcx1, dcy1 = 5*wx4, 5*wy4 # anchor placement of search roi's along the edge
-        dcx2, dcy2 = int((by[1]-dcy1 -by[0]-dcy1)/6), int((bx[1]-dcx1 -bx[0]-dcx1)/6)
+        dcx2, dcy2 = int((bx[1]-dcx1 -bx[0]-dcx1)/6), int((by[1]-dcy1 -by[0]-dcy1)/6)
         lft = np.array([ [bx[0]    , bx[0]  , bx[0] , bx[0]]       , [by[0]+dcy1, cy+dcy2, cy-dcy2, by[1]-dcy1] ])
         rht = np.array([ [bx[1]    , bx[1]  , bx[1] , bx[1]]       , [by[0]+dcy1, cy+dcy2, cy-dcy2, by[1]-dcy1] ])
         top = np.array([ [bx[0]+dcx1, cx+dcx2, cx-dcx2, bx[1]-dcx1], [by[0]     , by[0]  , by[0]  , by[0]] ])
@@ -779,8 +795,8 @@ def my_prediction(img, img_name= None):
             [[btm[0,3] - hwx, btm[0,3] + hwx], [btm[1,3] - hwyp, btm[1,3] + hwyn]] 
             ])
 
-##        if False:
-        if True:
+        if False:
+#        if True:
             pwx, pwy = wx * 4, wy * 4
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
             plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
@@ -801,28 +817,28 @@ def my_prediction(img, img_name= None):
 ##########//
         side = 0  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 4):   # 0,1,2,3 patch within a side
-            pn = 3*side + sn     # patch number
+            pn = 4*side + sn     # patch number
             lft[0,sn], lft[1,sn] = find_gate_edge(lft[0,sn], lft[1,sn], patch[pn,0], patch[pn,1], gwx, img_dxNeg, img_dxPos, axis=0, posdir=True, gray=gray, img_name=img_name)
 
         side = 1  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 4):   # 0,1,2,3 patch within a side
-            pn = 3*side + sn     # patch number
+            pn = 4*side + sn     # patch number
             rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], gwx, img_dxPos, img_dxNeg, axis=0, posdir=False, gray=gray, img_name=img_name)
 
         side = 2  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 4):   # 0,1,2,3 patch within a side
-            pn = 3*side + sn     # patch number
+            pn = 4*side + sn     # patch number
             top[0,sn], top[1,sn] = find_gate_edge(top[0,sn], top[1,sn], patch[pn,0], patch[pn,1], gwy, img_dyNeg, img_dyPos, axis=1, posdir=True, gray=gray, img_name=img_name)
 
         side = 3  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 4):   # 0,1,2,3 patch within a side
-            pn = 3*side + sn     # patch number
+            pn = 4*side + sn     # patch number
             btm[0,sn], btm[1,sn] = find_gate_edge(btm[0,sn], btm[1,sn], patch[pn,0], patch[pn,1], gwy, img_dyPos, img_dyNeg, axis=1, posdir=False, gray=gray, img_name=img_name)
 
-        lft_l = linefit4(lft[1], lft[0]) # x = ay + b
-        rht_l = linefit4(rht[1], rht[0])
-        top_l = linefit4(top[0], top[1]) # y = ax + b
-        btm_l = linefit4(btm[0], btm[1])
+        lft_l = linefit(lft[1], lft[0]) # x = ay + b
+        rht_l = linefit(rht[1], rht[0])
+        top_l = linefit(top[0], top[1]) # y = ax + b
+        btm_l = linefit(btm[0], btm[1])
         g1 = line_intersection(top_l, lft_l)
         g2 = line_intersection(top_l, rht_l)
         g3 = line_intersection(btm_l, rht_l)
@@ -868,13 +884,13 @@ def my_prediction(img, img_name= None):
         plt.show()
     return bb
 
-def linefit4(ax, ay, sensitivity=0.8):
+def linefit(ax, ay, sensitivity=0.8):
     """
-    Args: ax=[x0,x1,x2] (3 equally spaced independent variables)
+    Args: ax=[x0,x1,x2] independent variables
           ay=[y0,y1,y2]
     """
-    m = (ay[2] - ay[0]) / (ax[2] - ax[0]) * sensitivity
-    return [m, sum(ay)/3 - m* sum(ax)/3]
+    fit = polyfit(ax, ay, 1)
+    return fit[0], fit[1]
 
 def linefit3(ax, ay, sensitivity=0.8):
     """
