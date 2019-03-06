@@ -753,28 +753,34 @@ def my_prediction(img, img_name= None):
             if wy4 < w4_pixelsPerBin:
                 hwyn,hwyp = 6 * w4_pixelsPerBin, 5 * w4_pixelsPerBin
 
-        dcx, dcy = 5*wx4, 5*wy4 # anchor placement of search roi's along the edge
-        lft = np.array([ [bx[0]    , bx[0], bx[0]]     , [by[0]+dcy, cy   , by[1]-dcy] ])
-        rht = np.array([ [bx[1]    , bx[1], bx[1]]     , [by[0]+dcy, cy   , by[1]-dcy] ])
-        top = np.array([[bx[0]+dcx, cx, bx[1]-+dcx], [by[0], by[0], by[0]]])
-        btm = np.array([[bx[0]+dcx, cx, bx[1]-+dcx], [by[1], by[1], by[1]]])
+        dcx1, dcy1 = 5*wx4, 5*wy4 # anchor placement of search roi's along the edge
+        dcx2, dcy2 = int((by[1]-dcy1 -by[0]-dcy1)/6), int((bx[1]-dcx1 -bx[0]-dcx1)/6)
+        lft = np.array([ [bx[0]    , bx[0]  , bx[0] , bx[0]]       , [by[0]+dcy1, cy+dcy2, cy-dcy2, by[1]-dcy1] ])
+        rht = np.array([ [bx[1]    , bx[1]  , bx[1] , bx[1]]       , [by[0]+dcy1, cy+dcy2, cy-dcy2, by[1]-dcy1] ])
+        top = np.array([ [bx[0]+dcx1, cx+dcx2, cx-dcx2, bx[1]-dcx1], [by[0]     , by[0]  , by[0]  , by[0]] ])
+        btm = np.array([ [bx[0]+dcx1, cx+dcx2, cx-dcx2, bx[1]-dcx1], [by[1]     , by[1]  , by[1]  , by[1]] ])
 
         patch = np.array([
             [[lft[0,0] - vwxn, lft[0,0] + vwxp], [lft[1,0] - vwy, lft[1,0] + vwy]],
             [[lft[0,1] - vwxn, lft[0,1] + vwxp], [lft[1,1] - vwy, lft[1,1] + vwy]],
             [[lft[0,2] - vwxn, lft[0,2] + vwxp], [lft[1,2] - vwy, lft[1,2] + vwy]],
+            [[lft[0,3] - vwxn, lft[0,3] + vwxp], [lft[1,3] - vwy, lft[1,3] + vwy]],
             [[rht[0,0] - vwxp, rht[0,0] + vwxn], [rht[1,0] - vwy, rht[1,0] + vwy]],
             [[rht[0,1] - vwxp, rht[0,1] + vwxn], [rht[1,1] - vwy, rht[1,1] + vwy]],
             [[rht[0,2] - vwxp, rht[0,2] + vwxn], [rht[1,2] - vwy, rht[1,2] + vwy]],
+            [[rht[0,3] - vwxp, rht[0,3] + vwxn], [rht[1,3] - vwy, rht[1,3] + vwy]],
             [[top[0,0] - hwx, top[0,0] + hwx], [top[1,0] - hwyn, top[1,0] + hwyp]],
             [[top[0,1] - hwx, top[0,1] + hwx], [top[1,1] - hwyn, top[1,1] + hwyp]],
             [[top[0,2] - hwx, top[0,2] + hwx], [top[1,2] - hwyn, top[1,2] + hwyp]],
+            [[top[0,3] - hwx, top[0,3] + hwx], [top[1,3] - hwyn, top[1,3] + hwyp]],
             [[btm[0,0] - hwx, btm[0,0] + hwx], [btm[1,0] - hwyp, btm[1,0] + hwyn]],
             [[btm[0,1] - hwx, btm[0,1] + hwx], [btm[1,1] - hwyp, btm[1,1] + hwyn]],
-            [[btm[0,2] - hwx, btm[0,2] + hwx], [btm[1,2] - hwyp, btm[1,2] + hwyn]] ])
+            [[btm[0,2] - hwx, btm[0,2] + hwx], [btm[1,2] - hwyp, btm[1,2] + hwyn]],
+            [[btm[0,3] - hwx, btm[0,3] + hwx], [btm[1,3] - hwyp, btm[1,3] + hwyn]] 
+            ])
 
-        if False:
-##        if True:
+##        if False:
+        if True:
             pwx, pwy = wx * 4, wy * 4
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
             plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
@@ -794,37 +800,37 @@ def my_prediction(img, img_name= None):
 ##########//
 ##########//
         side = 0  # 0=left, 1=right, 2=top, 3=bottom
-        for sn in range(0, 3):   # 0,1,2 patch within a side
-            pn = 3*side + sn       # patch number
+        for sn in range(0, 4):   # 0,1,2,3 patch within a side
+            pn = 3*side + sn     # patch number
             lft[0,sn], lft[1,sn] = find_gate_edge(lft[0,sn], lft[1,sn], patch[pn,0], patch[pn,1], gwx, img_dxNeg, img_dxPos, axis=0, posdir=True, gray=gray, img_name=img_name)
 
         side = 1  # 0=left, 1=right, 2=top, 3=bottom
-        for sn in range(0, 3):   # 0,1,2 patch within a side
-            pn = 3*side + sn       # patch number
+        for sn in range(0, 4):   # 0,1,2,3 patch within a side
+            pn = 3*side + sn     # patch number
             rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], gwx, img_dxPos, img_dxNeg, axis=0, posdir=False, gray=gray, img_name=img_name)
 
         side = 2  # 0=left, 1=right, 2=top, 3=bottom
-        for sn in range(0, 3):   # 0,1,2 patch within a side
-            pn = 3*side + sn       # patch number
+        for sn in range(0, 4):   # 0,1,2,3 patch within a side
+            pn = 3*side + sn     # patch number
             top[0,sn], top[1,sn] = find_gate_edge(top[0,sn], top[1,sn], patch[pn,0], patch[pn,1], gwy, img_dyNeg, img_dyPos, axis=1, posdir=True, gray=gray, img_name=img_name)
 
         side = 3  # 0=left, 1=right, 2=top, 3=bottom
-        for sn in range(0, 3):   # 0,1,2 patch within a side
-            pn = 3*side + sn       # patch number
+        for sn in range(0, 4):   # 0,1,2,3 patch within a side
+            pn = 3*side + sn     # patch number
             btm[0,sn], btm[1,sn] = find_gate_edge(btm[0,sn], btm[1,sn], patch[pn,0], patch[pn,1], gwy, img_dyPos, img_dyNeg, axis=1, posdir=False, gray=gray, img_name=img_name)
 
-        lft_l = linefit3(lft[1], lft[0]) # x = ay + b
-        rht_l = linefit3(rht[1], rht[0])
-        top_l = linefit3(top[0], top[1]) # y = ax + b
-        btm_l = linefit3(btm[0], btm[1])
+        lft_l = linefit4(lft[1], lft[0]) # x = ay + b
+        rht_l = linefit4(rht[1], rht[0])
+        top_l = linefit4(top[0], top[1]) # y = ax + b
+        btm_l = linefit4(btm[0], btm[1])
         g1 = line_intersection(top_l, lft_l)
         g2 = line_intersection(top_l, rht_l)
         g3 = line_intersection(btm_l, rht_l)
         g4 = line_intersection(btm_l, lft_l)
         bb = np.array([g1, g2, g3, g4])
 
-        if False:
-##        if True:
+##        if False:
+        if True:
             pwx, pwy = wx * 4, wy * 4
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
             plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
@@ -862,7 +868,7 @@ def my_prediction(img, img_name= None):
         plt.show()
     return bb
 
-def linefit3(ax, ay, sensitivity=0.8):
+def linefit4(ax, ay, sensitivity=0.8):
     """
     Args: ax=[x0,x1,x2] (3 equally spaced independent variables)
           ay=[y0,y1,y2]
@@ -870,6 +876,13 @@ def linefit3(ax, ay, sensitivity=0.8):
     m = (ay[2] - ay[0]) / (ax[2] - ax[0]) * sensitivity
     return [m, sum(ay)/3 - m* sum(ax)/3]
 
+def linefit3(ax, ay, sensitivity=0.8):
+    """
+    Args: ax=[x0,x1,x2] (3 equally spaced independent variables)
+          ay=[y0,y1,y2]
+    """
+    m = (ay[2] - ay[0]) / (ax[2] - ax[0]) * sensitivity
+    return [m, sum(ay)/3 - m* sum(ax)/3]
 
 def line_intersection(ly, lx):
     """
