@@ -742,15 +742,15 @@ def my_prediction(img, img_name= None):
             wsx = int(wsy/4)
         wx4, wy4 = wx//2, wy//2
         gwx, gwy = 2*wx + wsx,  2*wy + wsy   # Max search length=  gate width + scafolding
-        vwxn,vwxp, vwy = 3*wx4,5*wx4+wsx,wy4 # -vwxn,+vwxp roi width added to anchor, vwy= +/-vertical range
-        hwyn,hwyp, hwx = 3*wy4,5*wy4+wsy,wx4 # -hwyn,+hwyp roi hight added to anchor, hwx= +/-horizonal range
+        vwxn,vwxp, vwy = 3*wx4,4*wx4+wsx,wy4 # -vwxn,+vwxp roi width added to anchor, vwy= +/-vertical range
+        hwyn,hwyp, hwx = 3*wy4,4*wy4+wsy,wx4 # -hwyn,+hwyp roi hight added to anchor, hwx= +/-horizonal range
 
         # The gate positions is only accurate to pixelsPerBin=20 from find_gate_roi()
 #        if False:
         if True:
             w4_pixelsPerBin=5 #20/4
             if wx4 < w4_pixelsPerBin or wy4 < w4_pixelsPerBin:
-                pwx, pwy = w4_pixelsPerBin* 4, w4_pixelsPerBin * 4
+                pwx, pwy = w4_pixelsPerBin* 8, w4_pixelsPerBin * 8
                 pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
                 img_dx = np.add(img_dxNeg[pby[0]:pby[1], pbx[0]:pbx[1]], img_dxPos[pby[0]:pby[1], pbx[0]:pbx[1]])
                 img_dy = np.add(img_dyNeg[pby[0]:pby[1], pbx[0]:pbx[1]], img_dyPos[pby[0]:pby[1], pbx[0]:pbx[1]])
@@ -759,15 +759,15 @@ def my_prediction(img, img_name= None):
                 sum_dx, sum_dy = np.sum(img_dy, axis=0), np.sum(img_dx, axis=1)
                 avg_x= np.average(np.arange(pbx[0],pbx[1]),weights=sum_dx)
                 avg_y= np.average(np.arange(pby[0],pby[1]),weights=sum_dy)
-                #avg_x += 10           
                 dcx, dcy = int(avg_x -cx+0.5), int(avg_y-cy+0.5)
                 bx, by = bx + dcx, by+ dcy
                 cx, cy = cx+ dcx, cy+dcy
-
-            if wx4 < w4_pixelsPerBin:
-                vwxn,vwxp = 6 * w4_pixelsPerBin, 5 * w4_pixelsPerBin
-            if wy4 < w4_pixelsPerBin:
-                hwyn,hwyp = 6 * w4_pixelsPerBin, 5 * w4_pixelsPerBin
+            if False:
+#            if True:
+                if wx4 < w4_pixelsPerBin:
+                    vwxn,vwxp = 6 * w4_pixelsPerBin, 5 * w4_pixelsPerBin
+                if wy4 < w4_pixelsPerBin:
+                    hwyn,hwyp = 6 * w4_pixelsPerBin, 5 * w4_pixelsPerBin
 
         dcx1, dcy1 = 5*wx4, 5*wy4 # anchor placement of search roi's along the edge
         dcx2, dcy2 = int((bx[1]-dcx1 -bx[0]-dcx1)/6), int((by[1]-dcy1 -by[0]-dcy1)/6)
