@@ -12,7 +12,8 @@ import time
 from scipy.ndimage import maximum_filter1d
 from scipy.signal import find_peaks
 from scipy import polyfit
-
+import os
+G_GT_LABES = None
 
 def ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues = False):
     tmp = cv2.scaleAdd(SrcArray, 255.4999/MaxFloat -1, SrcArray)
@@ -845,8 +846,8 @@ def my_prediction(img, img_name= None):
         g4 = line_intersection(btm_l, lft_l)
         bb = np.array([g1, g2, g3, g4])
 
-##        if False:
-        if True:
+        if False:
+##xx        if True:
             pwx, pwy = wx * 4, wy * 4
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
             plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
@@ -873,9 +874,18 @@ def my_prediction(img, img_name= None):
         bb = np.array([ [bx[0], by[0]], [bx[1], by[0]], [bx[1], by[1]], [bx[0], by[1]] ])
     ### Find the exact gate corner positions by analyzing the sobel'd image
 
-##xx    dbg_show = True
-    dbg_show = False
+    dbg_show = True
+##xx    dbg_show = False
     if dbg_show:
+        global G_GT_LABES
+        if G_GT_LABES is None:
+            script_path = os.path.dirname(os.path.realpath(__file__))
+            with open(script_path+"/training_GT_labels_v2.json", 'r') as f:
+                G_GT_LABES = json.load(f)
+        GT_box = G_GT_LABES[img_name]
+        pgt_x, pgt_y = GT_box[0][::2], GT_box[0][1::2]
+        pgt_x, pgt_y = np.append(pgt_x, pgt_x[0]), np.append(pgt_y, pgt_y[0])
+        plt.plot(pgt_x, pgt_y, color="red", linewidth=2)
         plt.imshow(gray, 'gray'), plt.title(img_name)
         # The final gate coord
         plt_x, plt_y = bb[:, 0], bb[:, 1]
@@ -883,6 +893,7 @@ def my_prediction(img, img_name= None):
         plt.plot(plt_x, plt_y, color="lime", linewidth=2)
         plt.show()
     return bb
+
 
 def linefit(ax, ay, sensitivity=0.8):
     """
