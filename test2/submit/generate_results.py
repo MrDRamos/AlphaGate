@@ -166,6 +166,7 @@ def plotbxy(px, py, color="red", linewidth=1, win=None):
     else:
         win.plot(pltx, plty, color=color, linewidth=linewidth)
 
+
 def plotcxy(cx, cy, color="red", marker='+', markersize=8, linewidth=1, win=None):
     if win is None:
         plt.plot([cx], [cy], color=color, marker=marker, markersize=markersize, linewidth=linewidth)
@@ -189,6 +190,7 @@ def plot_edge_clusters(img, edge_p, clusters):
         for Point in PointS:
             x,y = Point.ravel()
             cv2.circle(img, (x,y), 1, color, -1)
+
 
 # img = gray 1 channnel
 def plot_edge_features(gray, edge_x, edge_y, clusters = 10):
@@ -223,6 +225,7 @@ def plot_edge_features(gray, edge_x, edge_y, clusters = 10):
     plt.show()
 
 
+
 #### 2D Edge0-Feature Histogram #####
 # https://docs.opencv.org/2.4/modules/imgproc/doc/histograms.html?highlight=calchist#calchist
 # https://docs.opencv.org/3.3.1/dd/d0d/tutorial_py_2d_histogram.html
@@ -232,7 +235,7 @@ def edge_hist(edges, img, bin_dx, bin_dy = None):
     bin_x, bin_y = img.shape[1] // bin_dx, img.shape[0] // bin_dy
     rng_x, rng_y = [0, img.shape[1]],    [0, img.shape[0]]
     ex, ey       = edges[:,:,0].ravel(), edges[:,:,1].ravel()
-    # Note: we revers x,y so that the numpy result has shape propotions as the input image
+    # Note: we revers x,y so that the numpy result has same shape as the input image
     hist, xbins, ybins = np.histogram2d(ey, ex, [bin_y, bin_x], [rng_y, rng_x])
 #    hist, xbins, ybins = np.histogram2d(ex, ey, [bin_x, bin_y], [rng_x, rng_y])
     #hist = cv2.calcHist([edge_x], [0,1], None, histSize = bins, ranges= ranges)
@@ -464,7 +467,7 @@ def find_gate_roi(gray, img_name= None):
 
     # Conbine X & Y edges
     edgeS = np.append(edge_x, edge_y, 0)
-    edgeN = edgeS.shape[0]
+    #edgeN = edgeS.shape[0]
 
     #### 2D Edge0-Feature Histogram #####
     pixelsPerBin = 20 #15 # 100 # 15 for small gate
@@ -534,7 +537,7 @@ def find_gate_roi(gray, img_name= None):
     # plt.imshow(hst_01), plt.show()
 
 
-    # Filter the selected edges based on the innew & outer edges of the final 2D hst
+    # Filter the selected gate edges based on the innew & outer edges of the final 2D hst
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
     hst_flt = np.multiply(hst_01, hst)
     wsumy, wsumx = np.sum(hst_flt, axis=0), np.sum(hst_flt, axis=1)
@@ -555,7 +558,7 @@ def find_gate_roi(gray, img_name= None):
 
 
     if False:
-##xx    if True:
+        ##xx    if True:
         chout = np.array([ [px[0], py[0]], [px[1], py[0]], [px[1], py[1]], [px[0], py[1]] ])
         cx, cy = int((medx +0.5) * pixelsPerBin), int((medy + 0.5) * pixelsPerBin)
         cout = (chout + 0.5) * pixelsPerBin
@@ -574,6 +577,84 @@ def find_gate_roi(gray, img_name= None):
         ax[1].imshow(gray, 'gray'), ax[1].set_title(img_name)
         plt.show()
 
+    ######## Get center-of-mass for each gate corner using the raw edgepoint data
+    """
+    Run this step after find_gate_roi() returns a rough rectangular box ROI.
+    We refine the Histogram ROI which only has a resolution of 20 pixels (=pixelsPerBin)
+    We generate a large enough patch around each corner and use it to filter out the edge
+    features within that corner patch. We then compute compute the center of mass for 
+    each corner using the feature point coordinates.
+    The final resolution is no longer dependent on the pixelsPerBin!
+    """
+    # Gate dim: inside = 8, out = 11 ->  width = 3/2 * /((8+11)/2) = 3/19
+    gdx, gdy = gx[1] - gx[0], gy[1] - gy[0]
+    gfx = gfy = 1
+    if 1.5*gdx < gdy:
+        gfx, gfy = 1.5, 2
+    elif 1.5*gdy < gdx:
+        gfx, gfy = 2, 1.5
+    wx, wy = int(gdx * 3/19), int(gdy * 3/19)  # Gate width
+    dwxp, dwyp = int(pixelsPerBin + gfx * wx), int(pixelsPerBin + gfy * wy)
+    dwxn, dwyn = int(pixelsPerBin + 1.5 * wx), int(pixelsPerBin + 1.5 * wy)
+    rx, ry = [max(0, gx[0] - dwxp), min(gray.shape[1], gx[1] + dwxp)], [max(0, gy[0] - dwyp), min(gray.shape[0], gy[1] + dwyp)]
+
+    # Define a genrous patch around each corner. Try to avoid the center which distorts the results
+    dx, dy = dwxp +dwxn, dwyp + dwyn
+    e0x, e0y = np.array([rx[0], rx[0] + dx]), np.array([ry[0], ry[0] + dy])
+    e1x, e1y = np.array([rx[1] -dx, rx[1]]), np.array([ry[0], ry[0] +dy])
+    e2x, e2y = np.array([rx[1] -dx, rx[1]]), np.array([ry[1] -dy, ry[1]])
+    e3x, e3y = np.array([rx[0], rx[0] + dx]), np.array([ry[1] - dy, ry[1]])
+
+    # Extract the feature points within each patch
+    ept = edgeS[:, 0,]
+    ept0 = np.array([pnt for pnt in ept if e0x[0] < pnt[0] and pnt[0] < e0x[1] and e0y[0] < pnt[1] and pnt[1] < e0y[1] ])
+    ept1 = np.array([pnt for pnt in ept if e1x[0] < pnt[0] and pnt[0] < e1x[1] and e1y[0] < pnt[1] and pnt[1] < e1y[1] ])
+    ept2 = np.array([pnt for pnt in ept if e2x[0] < pnt[0] and pnt[0] < e2x[1] and e2y[0] < pnt[1] and pnt[1] < e2y[1] ])
+    ept3 = np.array([pnt for pnt in ept if e3x[0] < pnt[0] and pnt[0] < e3x[1] and e3y[0] < pnt[1] and pnt[1] < e3y[1] ])
+
+    # Compute the center of mass coordinates
+    if 0 < ept0.size:
+        ep0 = np.average(ept0[:, 0]), np.average(ept0[:, 1])
+    else:
+        ep0 = gx[0], gy[0]
+    if 0 < ept1.size:
+        ep1 = np.average(ept1[:, 0]), np.average(ept1[:, 1])
+    else:
+        ep1 = gx[1], gy[0]
+    if 0 < ept2.size:
+        ep2 = np.average(ept2[:,0]), np.average(ept2[:,1])
+    else:
+        ep2 = gx[1], gy[1]
+    if 0 < ept3.size:
+        ep3 = np.average(ept3[:,0]), np.average(ept3[:,1])
+    else:
+        ep3 = gx[0], gy[1]
+    bb = np.array([ep0, ep1, ep2, ep3])
+
+#    if False:
+    if True:
+        img_r = gray[ry[0]:ry[1], rx[0]:rx[1]]
+        bx, by = gx - rx[0], gy - ry[0]
+        plt.imshow(img_r, "gray"), plotbxy(bx, by)
+        plotbxy(e0x - rx[0], e0y - ry[0]), plotbxy(e1x - rx[0], e1y - ry[0])
+        plotbxy(e2x - rx[0], e2y - ry[0]), plotbxy(e3x - rx[0], e3y - ry[0])
+        
+        # The final gate ROI coord
+        plt_x, plt_y = bb[:, 0] - rx[0], bb[:, 1] - ry[0]
+        plt_x, plt_y = np.append(plt_x, plt_x[0]), np.append(plt_y, plt_y[0])
+        plt.plot(plt_x, plt_y, color="lime", linewidth=2)
+
+        for pnt in ept0:
+            plotcxy(pnt[0]- rx[0], pnt[1]- ry[0], color="blue")
+        for pnt in ept1:
+            plotcxy(pnt[0]- rx[0], pnt[1]- ry[0], color="blue")
+        for pnt in ept2:
+            plotcxy(pnt[0]- rx[0], pnt[1]- ry[0], color="blue")
+        for pnt in ept3:
+            plotcxy(pnt[0] - rx[0], pnt[1] - ry[0], color="blue")
+
+        plt.show()
+   
     return gx, gy, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
 
 
