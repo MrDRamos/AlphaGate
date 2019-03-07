@@ -104,7 +104,9 @@ def get_corners_xy(img, maxCorners=128):
     qualityLevel = 0.1 # Parameter characterizing the minimal accepted quality of image corners
     minDistance = 6    # Minimum possible Euclidean distance between the returned corners
     blockSize = 3      # Default =3, Size of an average block for computing a derivative covariation matrix over each pixel neighborhood
-    CornerS = cv2.goodFeaturesToTrack(img, maxCorners, qualityLevel, minDistance, blockSize = blockSize)
+    CornerS = cv2.goodFeaturesToTrack(img, maxCorners, qualityLevel, minDistance, blockSize=blockSize)
+    # Try FAST feature detection
+    # https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_feature2d/py_fast/py_fast.html
 
     dbg_show = False
 #    dbg_show = True
