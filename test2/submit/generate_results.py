@@ -5,6 +5,7 @@ import os
 import json
 import cv2
 import numpy as np
+import sys
 
 # Implement a function that takes an image as an input, performs any preprocessing steps and outputs a list of bounding box detections and assosciated confidence score. 
 from matplotlib import pyplot as plt
@@ -107,6 +108,21 @@ def get_corners_xy(img, maxCorners=128):
     CornerS = cv2.goodFeaturesToTrack(img, maxCorners, qualityLevel, minDistance, blockSize=blockSize)
     # Try FAST feature detection
     # https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_feature2d/py_fast/py_fast.html
+
+    # Initiate FAST object with default values
+    fast = cv2.FastFeatureDetector()
+
+    # find and draw the keypoints
+    try:
+        kp = fast.detect(gray,None)
+        img2 = cv2.drawKeypoints(img, kp, color=(255,0,0))
+        # Print all default params
+        print( "Threshold: ", fast.getInt('threshold'))
+        print( "nonmaxSuppression: ", fast.getBool('nonmaxSuppression'))
+        print( "neighborhood: ", fast.getInt('type'))
+ #       print( "Total Keypoints with nonmaxSuppression: ", len(kp){})
+    except:
+        print("Unexpected error:", sys.exc_info()[0])
 
     dbg_show = False
 #    dbg_show = True
