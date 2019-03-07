@@ -1,6 +1,7 @@
 # This script is to be filled by the team members. 
 # Import necessary libraries
 # Load libraries
+import os
 import json
 import cv2
 import numpy as np
@@ -12,8 +13,6 @@ import time
 from scipy.ndimage import maximum_filter1d
 from scipy.signal import find_peaks
 from scipy import polyfit
-import os
-G_GT_LABES = None
 
 def ConvertFloat_ToU8(SrcArray, MaxFloat, NegValues = False):
     tmp = cv2.scaleAdd(SrcArray, 255.4999/MaxFloat -1, SrcArray)
@@ -846,8 +845,8 @@ def my_prediction(img, img_name= None):
         g4 = line_intersection(btm_l, lft_l)
         bb = np.array([g1, g2, g3, g4])
 
-        if False:
-##xx        if True:
+##xx        if False:
+        if True:
             pwx, pwy = wx * 4, wy * 4
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
             plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
@@ -863,10 +862,13 @@ def my_prediction(img, img_name= None):
             for i in range(plt_p.shape[1]):
                 plotcxy(plt_p[0, i], plt_p[1, i], color="lime", linewidth=2)
 
+            plot_GT(img_name, offset=(pbx[0], pby[0]), color="Yellow", linewidth=2)
+
             # The final gate coord
             plt_x, plt_y = bb[:, 0] - pbx[0], bb[:, 1] - pby[0]
             plt_x, plt_y = np.append(plt_x, plt_x[0]), np.append(plt_y, plt_y[0])
             plt.plot(plt_x, plt_y, color="lime", linewidth=2)
+
             plt.show()
 
     else:
@@ -874,19 +876,11 @@ def my_prediction(img, img_name= None):
         bb = np.array([ [bx[0], by[0]], [bx[1], by[0]], [bx[1], by[1]], [bx[0], by[1]] ])
     ### Find the exact gate corner positions by analyzing the sobel'd image
 
-    dbg_show = True
-##xx    dbg_show = False
+##xx    dbg_show = True
+    dbg_show = False
     if dbg_show:
-        global G_GT_LABES
-        if G_GT_LABES is None:
-            script_path = os.path.dirname(os.path.realpath(__file__))
-            with open(script_path+"/training_GT_labels_v2.json", 'r') as f:
-                G_GT_LABES = json.load(f)
-        GT_box = G_GT_LABES[img_name]
-        pgt_x, pgt_y = GT_box[0][::2], GT_box[0][1::2]
-        pgt_x, pgt_y = np.append(pgt_x, pgt_x[0]), np.append(pgt_y, pgt_y[0])
-        plt.plot(pgt_x, pgt_y, color="red", linewidth=2)
         plt.imshow(gray, 'gray'), plt.title(img_name)
+        plot_GT(img_name, color="red", linewidth=2)
         # The final gate coord
         plt_x, plt_y = bb[:, 0], bb[:, 1]
         plt_x, plt_y = np.append(plt_x, plt_x[0]), np.append(plt_y, plt_y[0])
@@ -894,6 +888,28 @@ def my_prediction(img, img_name= None):
         plt.show()
     return bb
 
+
+G_GT_LABES = None
+
+
+def get_GT(img_name):
+    global G_GT_LABES
+    if G_GT_LABES is None:
+        script_path = os.path.dirname(os.path.realpath(__file__))
+        with open(script_path+"/training_GT_labels_v2.json", 'r') as f:
+            G_GT_LABES = json.load(f)
+    GT_box = G_GT_LABES[img_name]
+    if GT_box is None or len(GT_box[0]) < 8:
+        return None,None
+    gt_x, gt_y = GT_box[0][::2], GT_box[0][1::2]
+    gt_x, gt_y = np.append(gt_x, gt_x[0]), np.append(gt_y, gt_y[0])
+    return gt_x, gt_y
+
+
+def plot_GT(img_name, offset=(0,0), color="red", linewidth=2):
+    pgt_x, pgt_y = get_GT(img_name)
+    if not pgt_x is None:
+        plt.plot(pgt_x -offset[0], pgt_y -offset[1], color="yellow", linewidth=linewidth)
 
 def linefit(ax, ay, sensitivity=0.8):
     """
