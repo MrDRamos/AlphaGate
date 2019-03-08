@@ -35,9 +35,12 @@ class mAPScorer():
             if img_key in pred_data.keys():
                 pred_box = pred_data[img_key]
             else:
-                pred_box = []
+                pred_box = [[]]
+            # if a ground truth box is present
+            if not pred_box:
+                pred_box = [[]]
             #if a ground predicitons are present:
-            if (len(pred_box) > 0):
+            if (len(pred_box[0]) > 0):
                 tp_fp_cf_i = self.metrics(
                                           np.array(GT_box),
                                           np.array(pred_box), self.THRESHOLD)
@@ -65,9 +68,10 @@ class mAPScorer():
                 pred_box = pred_data[img_key]
             else:
                 pred_box = [[]]
-            # if a ground truth box is presen
-
-            if (len(pred_box) > 0) :
+            # if a ground truth box is present
+            if not pred_box:
+                pred_box = [[]]
+            if (len(pred_box[0]) > 0) :
                 tp_fp_cf_i = self.metrics(
                                           np.array(GT_box),
                                           np.array(pred_box),
@@ -93,13 +97,13 @@ class mAPScorer():
         m, n = truth_boxes.shape
         if n == 0:
             tp_fp_cf[:, 1] = 1
-            tp_fp_cf[:, 2] = np.array([666])  # // np.array(test_boxes)[:, -1]
+            tp_fp_cf[:, 2] = np.array(test_boxes)[:, -1]
             return tp_fp_cf.tolist()
         # tp, fp, confidence
         # assign all boxes as false positives
         # Test which boxes detect given GT box.
         tp_fp_cf[:, 1] = 1
-        tp_fp_cf[:, 2] = np.array([666]) ##// np.array(test_boxes)[:, -1]
+        tp_fp_cf[:, 2] = np.array(test_boxes)[:, -1]
         for truth_box in truth_boxes:
             # for each ground truth box,
             # compute max IOU, and check if maxIOU>threshold,
@@ -109,12 +113,9 @@ class mAPScorer():
             for test_box in test_boxes:
                 # if box is already assigned,
                 # tp_fp_cf[box_id,1]=0, so dont use it
-                if 8 <= test_box.shape[0]:      ##//
-                    iou_box = self.calculate_iou(
+                iou_box = self.calculate_iou(
                                              truth_poly,
-                                             self.create_poly(test_box[0:8]))
-                else:
-                    iou_box = 0  ##//
+                                             self.create_poly(test_box[0: 8]))
                 ious.append(tp_fp_cf[box_id, 1] * iou_box)
                 box_id += 1
             max_iou = np.max(ious)

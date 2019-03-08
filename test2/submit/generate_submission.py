@@ -14,7 +14,7 @@ import os
 # python test2/submit/generate_submission.py
 script_path = os.path.dirname(os.path.realpath(__file__))
 image_dir = script_path + '/../../../Data_Training/'
-#image_dir = script_path + '/../../../Data_LeaderboardTesting/'
+image_dir = script_path + '/../../../Data_LeaderboardTesting/'
 ResultFilename = script_path + "/airvision_submission.json"
 #ResultFilename = script_path + "/random_submission.json"
 
