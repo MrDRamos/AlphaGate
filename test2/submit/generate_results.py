@@ -683,6 +683,7 @@ def find_gate_edge(ax, ay, rx, ry, rw, img_p, img_n, axis, posdir, gray, img_nam
 
     hst_p = img_p[ry[0]:ry[1], rx[0]:rx[1]]
     sum_p = np.sum(hst_p, axis=axis)
+    sum_p[sum_p.size-1] = 0 # force find_peaks() to onsider the bondery
     hgt_p = np.average(sum_p)*2
     pinf_p = find_peaks(sum_p, height=hgt_p, prominence=1)
     peak_p, psrt_p = pinf_p[0], pinf_p[1]['prominences']
@@ -693,8 +694,7 @@ def find_gate_edge(ax, ay, rx, ry, rw, img_p, img_n, axis, posdir, gray, img_nam
     pinf_n = find_peaks(sum_n, height=hgt_n, prominence=1)
     peak_n, psrt_n = pinf_n[0], pinf_n[1]['prominences']
     
-    #plt.subplot(2,2,1), plt.plot(sum_p)  , plt.subplot(2,2,2), plt.plot(sum_n) #plt.show()
-    #plt.subplot(2, 2, 3), plt.imshow(hst_p), plt.subplot(2, 2, 4), plt.imshow(hst_n), plt.show()
+    #plt.subplot(2,2,1), plt.plot(sum_p), plt.subplot(2,2,2), plt.plot(sum_n), plt.show(), plt.subplot(2, 2, 3), plt.imshow(hst_p), plt.subplot(2, 2, 4), plt.imshow(hst_n), plt.show()
     avg_p = cum_p = 0
     if 0 < peak_p.size:   
         avg_p = np.sum(np.multiply(peak_p, sum_p[peak_p]))
@@ -854,20 +854,19 @@ def my_prediction(img, img_name= None):
         else:
             sw0 = sw1 = sw2 = sw3 = min(gwx, gwy)/4
         sw = np.uint32([sw0 + .5, sw1 + .5, sw2 + .5, sw3 + .5])
-        sw = sw/2  # //
 
         # +/= Patch width Gate-Width/4
         pw = np.uint32(gws / 4 + 0.5)
         # Patch length extending outward from the gate
         pout = np.uint32(gw * .25 + 0.5)
         # Patch length extending towards the center of the gate
-        pin = np.uint32(np.add(gw * 0.75, sw) + 0.5)
+        pin = np.uint32(np.add(gw * 0.65, sw) + 0.5)
         # Patch anchors offset along the sides
         pofs = np.uint32(gws * 1.25 + 0.5)
         # Patch anchors gap along the sides
         pgap = np.uint32((glen - 2 * pofs) / 3.0 + 0.5)
         # lateral skew along the sides
-        gskew = np.array([bb[1, 1] - bb[0, 1], bb[2, 0] - bb[1, 0], bb[2, 1] - bb[3, 1], bb[3, 0] - bb[0, 0]])
+        gskew = np.single([bb[1, 1] - bb[0, 1], bb[2, 0] - bb[1, 0], bb[2, 1] - bb[3, 1], bb[3, 0] - bb[0, 0]])
         gskew *= 1.2 # we tend to underestamete the skes because we including not just checker-flag points
         # Patch lateral offsets per/gap
         plat = pgap * gskew / glen
@@ -935,6 +934,8 @@ def my_prediction(img, img_name= None):
                 plotcxy(plt_p[0, i], plt_p[1, i], color="Red", linewidth=2)
             plt.show()
 
+######//
+######//
         side = 0  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 4):   # 0,1,2,3 patch within a side
             pn = 4*side + sn     # patch number

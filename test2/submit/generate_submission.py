@@ -32,13 +32,17 @@ def UseTrainingImages(qty=20):
     #### data_ofs = img_keys.index('IMG_9180.JPG')  # + angle + partial gates
     #data_ofs = img_keys.index('IMG_0638.JPG')  # large + angle
 
-    data_ofs = img_keys.index('IMG_4759.JPG')  # large + angle
-    #data_ofs = img_keys.index('IMG_4762.JPG')  # large + angle
+    #data_ofs = img_keys.index('IMG_4759.JPG')  # large + angle
     #data_ofs = img_keys.index('IMG_0711.JPG') # small + angle
-    #data_ofs = img_keys.index('IMG_1625.JPG') ## no gate, 492, 5199
+    data_ofs = img_keys.index('IMG_1625.JPG') ## no gate, 492, 5199
 
+    # todo:
+    ## data_ofs = img_keys.index('IMG_4761.JPG')  # Clipped by Histogram !! fix it
+    ## data_ofs = img_keys.index('IMG_4746.JPG')  # Cant find gate -fixe histogram -> clipp off weaker side
+    
     #data_ofs = img_keys.index('IMG_3574.JPG')
     img_keys = img_keys[data_ofs: data_ofs + qty]
+
 
 #UseTrainingImages()
 
