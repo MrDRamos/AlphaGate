@@ -43,7 +43,7 @@ class mAPScorer():
             if (len(pred_box[0]) > 0):
                 tp_fp_cf_i = self.metrics(
                                           np.array(GT_box),
-                                          np.array(pred_box), self.THRESHOLD)
+                                          np.array(pred_box), self.THRESHOLD, img_key)
                 tp_fp_cf += tp_fp_cf_i
         mAP, mAP_points = self.map_eleven(tp_fp_cf, n_GT)
         return mAP, mAP_points
@@ -75,7 +75,7 @@ class mAPScorer():
                 tp_fp_cf_i = self.metrics(
                                           np.array(GT_box),
                                           np.array(pred_box),
-                                          IOU_threshold)
+                                          IOU_threshold, img_key)
                 tp_fp_cf += tp_fp_cf_i
         mAP, mAP_points = self.map_eleven(np.array(tp_fp_cf), n_GT)
         return mAP
@@ -86,7 +86,7 @@ class mAPScorer():
             n += len(dict_[key])
         return n
 
-    def metrics(self, truth_boxes, test_boxes, IOU_threshold):
+    def metrics(self, truth_boxes, test_boxes, IOU_threshold, file_name):
         # all should be numpy arrays
         # truth box is 1x8: [x1,y1...x4, y4]
         # test_boxes is Nx9: [x1,y1... x4, y4, confidence]
@@ -123,6 +123,11 @@ class mAPScorer():
             if (max_iou > IOU_threshold):
                 tp_fp_cf[argmax_iou, 0] = 1
                 tp_fp_cf[argmax_iou, 1] = 0
+
+        outp = "\"" + file_name + "\" , " + str(iou_box)
+        print(outp)
+#        with open("./score_details.csv", 'a') as f:
+#            f.write(outp)
         return tp_fp_cf.tolist()
 
     def map_eleven(self, tp_fp_cf, total_truths):
