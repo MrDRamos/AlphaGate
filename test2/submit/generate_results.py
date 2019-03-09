@@ -109,20 +109,23 @@ def get_corners_xy(img, maxCorners=128):
     # Try FAST feature detection
     # https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_feature2d/py_fast/py_fast.html
 
-    # Initiate FAST object with default values
-    fast = cv2.FastFeatureDetector()
+    dbg_show = False
+#    dbg_show = True
+    if dbg_show:
+        # Initiate FAST object with default values
+        fast = cv2.FastFeatureDetector()
 
-    # find and draw the keypoints
-    try:
-        kp = fast.detect(gray,None)
-        img2 = cv2.drawKeypoints(img, kp, color=(255,0,0))
-        # Print all default params
-        print( "Threshold: ", fast.getInt('threshold'))
-        print( "nonmaxSuppression: ", fast.getBool('nonmaxSuppression'))
-        print( "neighborhood: ", fast.getInt('type'))
- #       print( "Total Keypoints with nonmaxSuppression: ", len(kp){})
-    except:
-        print("Unexpected error:", sys.exc_info()[0])
+        # find and draw the keypoints
+        try:
+            kp = fast.detect(gray,None)
+            img2 = cv2.drawKeypoints(img, kp, color=(255,0,0))
+            # Print all default params
+            print( "Threshold: ", fast.getInt('threshold'))
+            print( "nonmaxSuppression: ", fast.getBool('nonmaxSuppression'))
+            print( "neighborhood: ", fast.getInt('type'))
+ #           print( "Total Keypoints with nonmaxSuppression: ", len(kp){})
+        except:
+            print("Unexpected error:", sys.exc_info()[0])
 
     dbg_show = False
 #    dbg_show = True
@@ -453,6 +456,13 @@ def hst_filter(hst, img_name= None):
     
 
 def find_gate_roi(gray, img_name= None):
+	
+    blur = cv2.GaussianBlur(gray,(7,7),0)
+    ret, gray = cv2.threshold(blur,125,255,cv2.THRESH_TOZERO+cv2.THRESH_OTSU)
+ #   plt.subplot(111), plt.imshow(gray, cmap='gray'), plt.xticks([]), plt.yticks([]), plt.title("Binary-Otsu Threshold")
+ #   plt.show()
+ 
+ 
     # Extract edge features
     maxCorners  = 250 #128  at lead 40/corner + Top/Btm AIRR Lables + some outliers which we will have to filter
     ksize = 3   # kernal size
