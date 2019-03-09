@@ -968,7 +968,7 @@ def my_prediction(img, img_name= None):
         bb = np.array([g1, g2, g3, g4])
 
         if False:
-            ##xx        if True:
+##xx        if True:
             pwx, pwy = int(3*gws[0]), int(3*gws[1])
             bx,by = np.uint32([bb[0,0],bb[2,0]]), np.uint32([bb[0,1],bb[2,1]])
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
@@ -998,8 +998,8 @@ def my_prediction(img, img_name= None):
         bb = bb
     ### Find the exact gate corner positions by analyzing the sobel'd image
 
-##xx    dbg_show = True
-    dbg_show = False
+    dbg_show = True
+##xx    dbg_show = False
     if dbg_show:
         plt.imshow(gray, 'gray'), plt.title(img_name)
         plot_GT(img_name, color="red", linewidth=2)

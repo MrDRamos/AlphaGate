@@ -145,6 +145,8 @@ class mAPScorer():
         recalls_thresholds[-1] = 0.9999
         map_ = 0
         map_all = []
+        print("")
+        print("file, score")
         for thresh in recalls_thresholds:
             indexs = np.where(rec >= thresh)
             if len(indexs[0]) > 0:
