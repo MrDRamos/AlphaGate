@@ -44,6 +44,9 @@ conda install -c anaconda tensorflow
 # GPU:  
 conda install -c anaconda tensorflow-gpu
 
+#) scipy library
+conda install -c anaconda scipy
+
 #) needed by submit/helper.ph
 conda install -c anaconda matplotlib
 
@@ -57,7 +60,8 @@ conda install -c anaconda cython
 conda install -c anaconda opencv
 
 #) Intall all packages with one command:
-conda install -c anaconda pylint autopep8 tensorflow matplotlib shapely cython opencv
+conda install -c anaconda pylint autopep8 scipy matplotlib shapely cython opencv tensorflow
+conda install -c anaconda pylint autopep8 scipy matplotlib shapely cython opencv tensorflow tensorflow_gpu
 
 #===============================================================================
 #The resulting list of installed packages
