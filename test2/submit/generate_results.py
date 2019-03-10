@@ -68,7 +68,7 @@ def Sobel_SplitPosNeg(img, Horizontal=True, ksize=3, UseScharr= False):
         nstat = cv2.minMaxLoc(neg_grad); print(nstat)
         pstat = cv2.minMaxLoc(pos_grad); print(pstat)
         plt.subplot(1,3,1), plt.imshow(img_grad, 'gray'), plt.title('Float-gradiant')
-        plt.subplot(1,3,2), plt.imshow(neg_grad, 'gray'), plt.title('NegU8-gradiant')
+        plt.subplot(1,3,2), plt.imshow(neg_grad, 'gray'), plt.title('NegU8-gradiant')        
         plt.subplot(1,3,3), plt.imshow(pos_grad, 'gray'), plt.title('PosU8-gradiant')
         plt.show()
     return neg_grad, pos_grad
@@ -104,13 +104,17 @@ def get_corners_xy(img, maxCorners=128):
     qualityLevel = 0.1 # Parameter characterizing the minimal accepted quality of image corners
     minDistance = 6    # Minimum possible Euclidean distance between the returned corners
     blockSize = 3      # Default =3, Size of an average block for computing a derivative covariation matrix over each pixel neighborhood
+
+    scale_intensity(img, 3, img) ##//
+    #maxCorners = 400 ##//
     CornerS = cv2.goodFeaturesToTrack(img, maxCorners, qualityLevel, minDistance, blockSize=blockSize)
     # Try FAST feature detection
     # https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_feature2d/py_fast/py_fast.html
 
     dbg_show = False
-#    dbg_show = True
+###    dbg_show = True
     if dbg_show:
+        print("corners = {0:}".format(CornerS.shape[0]))
         img_abs = convert2absU8(img)
         img_rgb = cv2.cvtColor(img_abs, cv2.COLOR_GRAY2RGB)
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 5.0)
@@ -254,7 +258,7 @@ def hst_filter(hst, img_name= None):
     # create tmp working copy of hst with 2 extra cols for 0-padding
     hst_flt = np.zeros((hst.shape[0]+4, hst.shape[1]+4), hst.dtype)
     hst_flt[2:-2,2:-2] = np.copy(hst)
-    #plt.subplot(1,2,1), plt.imshow(hst_flt), plt.subplot(1,2,2), plt.imshow(hst), plt.show() 
+    #plt.subplot(1,2,1), plt.imshow(hst_flt), plt.subplot(1,2,2), plt.imshow(hst), plt.show()
     hst_01 = hst_flt.clip(max=1)
 
     flt = np.zeros_like(hst_01)
@@ -435,6 +439,67 @@ def hst_filter(hst, img_name= None):
     ########## Histogtam blob Filters ##########
 
     
+def gate_side_score(gx, gy, hst, ref):
+    # Gate dim: inside = 8, out = 11 ->  width = 3/2 * /((8+11)/2) = 3/19
+    glen = np.array([ gx[1] - gx[0], gy[1] - gy[0] ])
+    # Gate-width propoertions
+    gwp = glen * 3.0 / 19
+    gwx, gwy = int((2*gwp[0] + gwp[1])/3 +1.5), int((gwp[0] + 2*gwp[1])/3 +1.5)
+
+    # Define a genrous patch around each side
+    mx, my = hst.shape[1], hst.shape[0]
+    s0x, s0y = [max(0, gx[0]-gwx), min(gx[1]+gwx, mx)] , [max(0, gy[0]-gwy), min(gy[0]+gwy, my)]
+    s1x, s1y = [max(0, gx[1]-gwx), min(gx[1]+gwx, mx)] , [max(0, gy[0]-gwy), min(gy[1]+gwy, my)]
+    s2x, s2y = [max(0, gx[0]-gwx), min(gx[1]+gwx, mx)] , [max(0, gy[1]-gwy), min(gy[1]+gwy, my)]
+    s3x, s3y = [max(0, gx[0]-gwx), min(gx[0]+gwx, mx)] , [max(0, gy[0]-gwy), min(gy[1]+gwy, my)]
+
+    # Count side weights: The upper, lower half are counted seperatly
+    sdx, sdy = int((s0x[1] - s0x[0] + 0.5)/2), int((s1y[1] - s1y[0] + 0.5)/2) # half length
+    s0c = [ np.sum(hst[s0y[0]:s0y[1], s0x[0] :s0x[0]+sdx]), 
+            np.sum(hst[s0y[0]:s0y[1], s0x[1]-sdx :s0x[1]]) ]
+    s1c = [ np.sum(hst[s1y[0]:s1y[0] +sdy, s1x[0]:s1x[1]]), 
+            np.sum(hst[s1y[1]-sdy :s1y[1], s1x[0]:s1x[1]]) ]
+    s2c = [ np.sum(hst[s2y[0]:s2y[1], s2x[0] :s2x[0]+ sdx]), 
+            np.sum(hst[s2y[0]:s2y[1], s2x[1]-sdx: s2x[1]]) ]
+    s3c = [ np.sum(hst[s3y[0]: s3y[0]+sdy, s3x[0]:s3x[1]]), 
+            np.sum(hst[s3y[1]-sdy :s3y[1], s3x[0]:s3x[1]]) ]
+    s0n= s0c[0]+s0c[1]
+    s1n= s1c[0]+s1c[1]
+    s2n= s2c[0]+s2c[1]
+    s3n= s3c[0]+s3c[1]
+    
+    # Compute side scores [0..1] 1:= when both halfs of a side are equally populated
+    s0 = s1 = s2 =s3 = 0    
+    if 0 < s0n:
+        s0 = s0c[0]*s0c[1]*4/(s0n**2)
+    if 0 < s1n:   
+        s1 = s1c[0]*s1c[1]*4/(s1n**2)
+    if 0 < s2n:   
+        s2 = s2c[0]*s2c[1]*4/(s2n**2)
+    if 0 < s3n:   
+        s3 = s3c[0]*s3c[1]*4/(s3n**2)
+
+    gm = s0n+ s1n+ s2n + s3n # accumlated count over all 4 sides
+    # Error from expected side count: = 1 If the features are equaly distibuted to all sides
+    s0e = 1-4*max(0,abs(s0n/gm - 0.25))
+    s1e = 1-4*max(0,abs(s1n/gm - 0.25))
+    s2e = 1-4*max(0,abs(s2n/gm - 0.25))
+    s3e = 1-4*max(0,abs(s3n/gm - 0.25))
+
+    #Side Score: The fractional number of 4 sides. e.g 2sides->0.5, 3side->.75
+    gs = s0 + s1 +s2 + s3
+    #Gate box Score: weighted(for equal distribution) avarege side score
+    gb = (s0*s0e + s1*s1e +s2*s2e + s3*s3e)/4
+    #Combined Gate score
+    gn = gb * gm * gs
+
+    if False:
+#    if True: ##
+        print("{0:d} Sides= {1:.3f} Box={2:.3f} Count={3:d} Score={4:.3f}".format(ref,gs,gb,gm,gn)) 
+        plt.imshow(hst), plotbxy(s0x,s0y), plotbxy(s1x,s1y), plotbxy(s2x,s2y), plotbxy(s3x,s3y), plt.show()
+    return gs, gn
+
+
 
 def find_gate_roi(gray, img_name= None):
     # Extract edge features
@@ -477,82 +542,145 @@ def find_gate_roi(gray, img_name= None):
     hst = hst.astype(np.uint8)
     
     #### Remove small unconnected bins from the histogram ####
-    hst, hst_01 = hst_filter(hst)
+    if False:
+##    if True:
+        _hst, hst_01 = hst_filter(hst)
+        plt.subplot(1,2,1), plt.imshow(hst), plt.subplot(1,2,2), plt.imshow(_hst), plt.show()
+        hst = _hst
+    else:
+        hst, hst_01 = hst_filter(hst)
 
 
-    #### find the predominant blob ####
-    filtsize = 5
-    hsumy, hsumx = np.sum(hst_01, axis=0), np.sum(hst_01, axis=1)
-    # plt.plot(hsumy), plt.plot(hsumx), plt.show()
-    hsumy, hsumx = maximum_filter1d(hsumy, size=filtsize), maximum_filter1d(hsumx, size=filtsize)
-    hsumx[0] = hsumy[0] = hsumx[hsumx.size - 1] = hsumy[hsumy.size - 1] = 0 # make sure the borders are included
-    # plt.plot(hsumy), plt.plot(hsumx), plt.show()
-    xmax = find_peaks(hsumy)[0]
-    ymax = find_peaks(hsumx)[0]
+    ##### Find an RIO that most likely represents a square arrangement of features #####
+    sum_y, sum_x = np.sum(hst, axis=0), np.sum(hst, axis=1)
+    sum_x[0] = sum_y[0] = sum_x[sum_x.size - 1] = sum_y[sum_y.size - 1] = 0 # make sure the borders are included
+    # plt.plot(sum_y), plt.plot(sum_x), plt.show()
+    # plt.imshow(hst), plt.show()
+
+    hgt_y = np.average(sum_y) *.75
+    pinf_x = find_peaks(sum_y, height=hgt_y, distance=2, prominence=1)
+    peak_xi, prom_x = pinf_x[0], pinf_x[1]['prominences']
+    psrt_xs = np.flip(np.argsort(prom_x))
+    peak_x = peak_xi[psrt_xs]
+
+    hgt_x = np.average(sum_x) *.75
+    pinf_y = find_peaks(sum_x, height=hgt_x, distance=2, prominence=1)
+    peak_yi, prom_y = pinf_y[0], pinf_y[1]['prominences']
+    psrt_ys = np.flip(np.argsort(prom_y))
+    peak_y = peak_yi[psrt_ys]
 
     # Sanity check in case the image has no blobs
-    if 0 == xmax.size or 0 == ymax.size:
+    if peak_yi.size < 1 or peak_xi.size <1:
         return None, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
+    
+    # Keep the largest 2 peaks and include the next most prominant peak
+    if 2 < peak_xi.size:
+        psrt_xs = np.flip(np.argsort(prom_x))
+        peak_x = peak_xi[psrt_xs]
+        phgt_x = pinf_x[1]["peak_heights"]
+        phgt_xs= np.argsort(phgt_x)
+        p2h_x = peak_xi[phgt_xs[-2:]]
+        prm_x = peak_x[np.logical_and(peak_x!=p2h_x[0] ,peak_x!=p2h_x[1])]
+        peak_x= np.append(p2h_x, prm_x[0])
 
-    psumy, psumx = hsumy[xmax], hsumx[ymax]  # get the corresponding peak values
-    xsrt, ysrt = np.argsort(psumy), np.argsort(psumx)  # get array to sort by peaks
-    # we want coordinates of the largest 2 peaks
-    px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
-    py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
-    px, py = np.sort(px), np.sort(py)  # sort the coord from low to high
-    # plt.imshow(hst_01), plt.show()
+    if 2 < peak_yi.size:
+        psrt_ys = np.flip(np.argsort(prom_y))
+        peak_y = peak_yi[psrt_ys]
+        phgt_y = pinf_y[1]["peak_heights"]
+        phgt_ys= np.argsort(phgt_y)
+        p2h_y = peak_yi[phgt_ys[-2:]]
+        prm_y = peak_y[np.logical_and(peak_y!=p2h_y[0] ,peak_y!=p2h_y[1])]
+        peak_y= np.append(p2h_y, prm_y[0])
 
-    # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
-    span = hsumy[px[0]:px[1]]
-    zeros = len([w for w in span if w == 0])
-    pr = px
-    psum = hsumy
-    if max(0,span.size - filtsize) < 3 * zeros:
-        pc = xmax[xsrt[xsrt.size - 1]]  #pm = xmax[xmax.size - 1]        
-        pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
-        pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+
+    # remove the 3d peak if its between the 2 prominent ones and is less in height
+    if 2 < peak_y.size:
+        ps = np.sort(peak_y[:2])
+        if ps[0] < peak_y[2] and peak_y[2] < ps[1]:
+            peak_yh = pinf_y[1]["peak_heights"][psrt_ys]
+            ps = np.sort(peak_yh[:2])
+            if peak_yh[2] < ps[0] and peak_yh[2] < ps[1]:
+                peak_y = peak_y[:2]
+
+    if 2 < peak_x.size:
+        ps = np.sort(peak_x[:2])
+        if ps[0] < peak_x[2] and peak_x[2] < ps[1]:
+            peak_xh = pinf_y[1]["peak_heights"][psrt_ys]
+            ps = np.sort(peak_xh[:2])
+            if peak_xh[2] < ps[0] and peak_xh[2] < ps[1]:
+                peak_x = peak_x[:2]
+
+    if 2 < peak_x.size:
+        cbx = [[0,1],[0,2],[1,2]]
     else:
-        if 0 == zeros:
-            pc = pr[0]
-            pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
-            pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
-    hst_01[:,:pr[0]] = 0
-    hst_01[:, pr[1]:] = 0
-    # plt.imshow(hst_01), plt.show()
-
-    # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
-    span = hsumx[py[0]:py[1]]
-    zeros = len([w for w in span if w == 0])
-    pr = py
-    psum = hsumx
-    if max(0,span.size - filtsize) < 3 * zeros:
-        pc = ymax[ysrt[ysrt.size - 1]]  #ymax[ymax.size - 1]
-        pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
-        pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+        cbx = [[0,1]]
+    if 2 < peak_y.size:
+        cby = [[0,1],[0,2],[1,2]]
     else:
-        if 0 == zeros:
-            pc = pr[1]
-            pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
-            pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
-    hst_01[:pr[0], :] = 0
-    hst_01[pr[1]:, :] = 0
+        cby = [[0,1]]
+
+    gsa = [0,0,0,0,0,0,0,0,0]
+    gna = [0,0,0,0,0,0,0,0,0]
+    gi = 0
+    for cbxi in cbx:
+        for cbyi in cby:
+            gx, gy = np.sort(peak_x[cbxi]), np.sort(peak_y[cbyi])
+            gsa[gi], gna[gi] = gate_side_score(gx, gy, hst, gi)
+            gi += 1
+    gi = np.flip(np.argsort(gna))[0]
+    gs, gn = gsa[gi], gna[gi]
+    gix, giy = gi // len(cby), gi % len(cby)
+    gx, gy = np.sort(peak_x[cbx[gix]]), np.sort(peak_y[cby[giy]])
+    #print("Gate score({0:d}) = {1:.2f}".format(gi,gn))
+    #plt.imshow(hst), plotbxy(gx,gy),  plt.show()
+    ##### Find the RIO that most likely represents a square arrangement of features #####
+
+
+    # Truncate the histogram to the RIO we just found
+    # Gate dim: inside = 8, out = 11 ->  width = 3/2 * /((8+11)/2) = 3/19
+    glen = np.array([ gx[1] - gx[0], gy[1] - gy[0] ])
+    # Gate-width propoertions
+    gwp = glen * 3.0 / 19
+    gwx, gwy = int((2*gwp[0] + gwp[1])/3 +2.5), int((gwp[0] + 2*gwp[1])/3 +2.5)
+    hst_01[:, :max(0,gx[0]-gwx)] = 0
+    hst_01[:, min(gx[1]+gwx, hst_01.shape[1]):] = 0
+    hst_01[:max(0,gy[0]-gwy), :] = 0
+    hst_01[min(gy[1]+gwy, hst_01.shape[0]):, :] = 0
     # plt.imshow(hst_01), plt.show()
-
-
-    # Filter the selected gate edges based on the innew & outer edges of the final 2D hst
-    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
     hst_flt = np.multiply(hst_01, hst)
-    wsumy, wsumx = np.sum(hst_flt, axis=0), np.sum(hst_flt, axis=1)
+    # plt.imshow(hst_01), plt.show()
 
-    peaks = find_peaks(wsumy, prominence=1)
-    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
-    if 1 < pmax.size:
-        px = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+    # Do a final edge histogram after all cleanup from the prior stage
+    sum_y, sum_x = np.sum(hst_flt, axis=0), np.sum(hst_flt, axis=1)
+    sum_x[0] = sum_y[0] = sum_x[sum_x.size - 1] = sum_y[sum_y.size - 1] = 0 # make sure the borders are included
 
-    peaks = find_peaks(wsumx, prominence=1)
-    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
-    if 1 < pmax.size:
-        py = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+    px, py = gx, gy
+
+    hgt_y = np.average(sum_y)/2
+    pinf_x = find_peaks(sum_y, height=hgt_y, distance=gwx//2, prominence=1)
+    peak_xi, prom_x = pinf_x[0], pinf_x[1]['prominences']
+    psrt_xs = np.flip(np.argsort(prom_x))
+    peak_x = peak_xi[psrt_xs]
+    # Use the new estimate unless its to far away from the first est. e.g. because we did not filter out center peaks
+    if 1 < peak_x.size:
+        px = np.sort(peak_x[:2])
+        if gwx < abs(px[0] - gx[0]):
+            px[0] = gx[0]
+        if gwx < abs(px[1] - gx[1]):
+            px[1] = gx[1]
+
+    hgt_x = np.average(sum_x)/2
+    pinf_y = find_peaks(sum_x, height=hgt_y, distance=gwy//2, prominence=1)
+    peak_yi, prom_y = pinf_y[0], pinf_y[1]['prominences']
+    psrt_ys = np.flip(np.argsort(prom_y))
+    peak_y = peak_yi[psrt_ys]
+    # Use the new estimate unless its to far away from the first est. e.g. because we did not filter out center peaks
+    if 1 < peak_y.size:
+        py = np.sort(peak_y[:2])
+        if gwy < abs(py[0] - gy[0]):
+            py[0] = gy[0]
+        if gwy < abs(py[1] - gy[1]):
+            py[1] = gy[1]
 
     px, py = np.sort(px), np.sort(py) # sort the coord from low to high
     medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
@@ -560,7 +688,7 @@ def find_gate_roi(gray, img_name= None):
 
 
     if False:
-        ##xx    if True:
+#    if True:
         chout = np.array([ [px[0], py[0]], [px[1], py[0]], [px[1], py[1]], [px[0], py[1]] ])
         cx, cy = int((medx +0.5) * pixelsPerBin), int((medy + 0.5) * pixelsPerBin)
         cout = (chout + 0.5) * pixelsPerBin
@@ -584,8 +712,8 @@ def find_gate_roi(gray, img_name= None):
     Run this step after find_gate_roi() returns a rough rectangular box ROI.
     We refine the Histogram ROI which only has a resolution of 20 pixels (=pixelsPerBin)
     We generate a large enough patch around each corner and use it to filter out the edge
-    features within that corner patch. We then compute compute the center of mass for 
-    each corner using the feature point coordinates.
+    features within that corner patch. We then compute the center of mass for 
+    each corner using its feature point coordinates.
     The final resolution is no longer dependent on the pixelsPerBin!
     """
     # Gate dim: inside = 8, out = 11 ->  width = 3/2 * /((8+11)/2) = 3/19
@@ -600,8 +728,14 @@ def find_gate_roi(gray, img_name= None):
     dwxn, dwyn = int(pixelsPerBin + 1.25 * wx), int(pixelsPerBin + 1.25 * wy)
     rx, ry = [max(0, gx[0] - dwxp), min(gray.shape[1], gx[1] + dwxp)], [max(0, gy[0] - dwyp), min(gray.shape[0], gy[1] + dwyp)]
 
-    # Define a genrous patch around each corner. Try to avoid the center which distorts the results
+    # Define a generous patch around each corner. Try to avoid the center which distorts the results
     dx, dy = dwxp +dwxn, dwyp + dwyn
+    lx2, ly2 = int((rx[1]- rx[0])/2 + 0.5), int((ry[1]-ry[0])/2 + 0.5)
+    if lx2 < dx: # Don't extend the box beyond the center
+        dx = lx2
+    if ly2 < dy:
+        dy = ly2
+
     e0x, e0y = np.array([rx[0], rx[0] + dx]), np.array([ry[0], ry[0] + dy])
     e1x, e1y = np.array([rx[1] -dx, rx[1]]), np.array([ry[0], ry[0] +dy])
     e2x, e2y = np.array([rx[1] -dx, rx[1]]), np.array([ry[1] -dy, ry[1]])
@@ -760,7 +894,7 @@ def my_prediction(img, img_name= None):
         plt.subplot(1, 2, 2), plt.imshow(gray_new)
         plt.show()
 
-    ############## Keep, This realy helps !! ############
+    ############## Do any of these helps ? ############
     # Clipp highest intensities(Light bulbs & fixtures) to improve gradiants at lower intensities
 #    if False:
     if True:
@@ -778,7 +912,7 @@ def my_prediction(img, img_name= None):
       return None
 
     if False: # Show 4 sobel's, gray & combined sobel
-#    if True:       
+#    if True:
         fig, axS = plt.subplots(2,3)
         ax = axS.ravel()
 
@@ -827,13 +961,13 @@ def my_prediction(img, img_name= None):
             cosa = gwx / gwy
             sina = 1 - (cosa ** 2) / 2  # range 0.5 .. 1
             if glen[3] < glen[1]:
-                sw1 = 0
                 sw3 = sw * sina
+                sw1 = sw3
                 gw[1] *= 2-cosa
                 gw[3] = gwy * cosa
             else:
-                sw3 = 0
                 sw1 = sw * sina
+                sw3 = sw1
                 gw[3] *= 2-cosa
                 gw[1] = gwy * cosa
         elif 1.25*gwy < gwx:
@@ -842,13 +976,13 @@ def my_prediction(img, img_name= None):
             cosa = gwx / gwy
             sina = 1 - (cosa ** 2) / 2  # range 0.5 .. 1
             if glen[0] < glen[2]:
-                sw2 = 0
                 sw0 = sw * sina
+                sw2 = sw0
                 gw[2] *= 2-cosa
                 gw[0] = gwx * cosa
             else:
-                sw0 = 0
                 sw2 = sw * sina
+                sw0 = sw2
                 gw[0] *= 2-cosa
                 gw[2] = gwx * cosa
         else:
@@ -967,8 +1101,8 @@ def my_prediction(img, img_name= None):
         bb0 = bb ##//
         bb = np.array([g1, g2, g3, g4])
 
-        if False:
-##xx        if True:
+##xx        if False: ##$$
+        if True:
             pwx, pwy = int(3*gws[0]), int(3*gws[1])
             bx,by = np.uint32([bb[0,0],bb[2,0]]), np.uint32([bb[0,1],bb[2,1]])
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
@@ -998,8 +1132,8 @@ def my_prediction(img, img_name= None):
         bb = bb
     ### Find the exact gate corner positions by analyzing the sobel'd image
 
-    dbg_show = True
-##xx    dbg_show = False
+##xx    dbg_show = True
+    dbg_show = False
     if dbg_show:
         plt.imshow(gray, 'gray'), plt.title(img_name)
         plot_GT(img_name, color="red", linewidth=2)
