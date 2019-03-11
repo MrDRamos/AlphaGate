@@ -25,14 +25,14 @@ img_keys = [img_i.split(os.sep)[-1] for img_i in img_file]
 
 def UseTrainingImages(qty=20):
     global img_keys; data_ofs = 0
-    #data_ofs = img_keys.index('IMG_0013.JPG')  # large + litle glare
+    data_ofs = img_keys.index('IMG_0013.JPG')  # large + litle glare
     #data_ofs = img_keys.index('IMG_3565.JPG') # small 
     #data_ofs = img_keys.index('IMG_4443.JPG') # + ladders
     ### data_ofs = img_keys.index('IMG_4746.JPG') # + ladders + glare + angle left
     ### data_ofs = img_keys.index('IMG_9180.JPG')  # + angle + partial gates
     #data_ofs = img_keys.index('IMG_0638.JPG')  # large + angle
 
-    #data_ofs = img_keys.index('IMG_4759.JPG')  # large + angle
+    data_ofs = img_keys.index('IMG_4759.JPG')  # large + angle
     #data_ofs = img_keys.index('IMG_0711.JPG') # small + angle
     #data_ofs = img_keys.index('IMG_1625.JPG') ## no gate, 492, 5199
 
@@ -46,7 +46,7 @@ def UseTrainingImages(qty=20):
     img_keys = img_keys[data_ofs: data_ofs + qty]
 
 
-UseTrainingImages()
+#UseTrainingImages()
 if False:
 #if True:
     img_keys = []
@@ -56,7 +56,7 @@ if False:
     img_keys += ['IMG_0013.JPG']   # large
     img_keys += ['IMG_0716.JPG']   # small angle
     img_keys += ['IMG_0638.JPG']   # angle
-#img_keys = ['IMG_0712.JPG'] 
+
 
 # Instantiate a new detector
 finalDetector = GenerateFinalDetections()

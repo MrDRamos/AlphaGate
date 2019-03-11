@@ -105,7 +105,7 @@ def get_corners_xy(img, maxCorners=128):
     minDistance = 6    # Minimum possible Euclidean distance between the returned corners
     blockSize = 3      # Default =3, Size of an average block for computing a derivative covariation matrix over each pixel neighborhood
 
-    scale_intensity(img, 3, img) ##//
+    scale_intensity(img, 5, img) ##//
     #maxCorners = 400 ##//
     CornerS = cv2.goodFeaturesToTrack(img, maxCorners, qualityLevel, minDistance, blockSize=blockSize)
     # Try FAST feature detection
@@ -481,20 +481,27 @@ def gate_side_score(gx, gy, hst, ref):
 
     gm = s0n+ s1n+ s2n + s3n # accumlated count over all 4 sides
     # Error from expected side count: = 1 If the features are equaly distibuted to all sides
-    s0e = 1-4*max(0,abs(s0n/gm - 0.25))
-    s1e = 1-4*max(0,abs(s1n/gm - 0.25))
-    s2e = 1-4*max(0,abs(s2n/gm - 0.25))
-    s3e = 1-4*max(0,abs(s3n/gm - 0.25))
+    s0e = max(0,1-4*(s0n/gm - 0.25)**2)
+    s1e = max(0,1-4*(s1n/gm - 0.25)**2)
+    s2e = max(0,1-4*(s2n/gm - 0.25)**2)
+    s3e = max(0,1-4*(s3n/gm - 0.25)**2)
 
     #Side Score: The fractional number of 4 sides. e.g 2sides->0.5, 3side->.75
     gs = s0 + s1 +s2 + s3
     #Gate box Score: weighted(for equal distribution) avarege side score
-    gb = (s0*s0e + s1*s1e +s2*s2e + s3*s3e)/4
+    gb = (s0 * s0e + s1 * s1e + s2 * s2e + s3 * s3e) / 4
+    
+    # This is a hack to reduce feature noise in the large horizontal image range
+    skew=1
+    if glen[1] < glen[0]:
+        skew = glen[1]/glen[0]
+        #print("skew ====== {0:.3f}".format(skew))
+
     #Combined Gate score
-    gn = gb * gm * gs
+    gn = gb * gm * gs * skew
 
     if False:
-#    if True: ##
+#    if True:
         print("{0:d} Sides= {1:.3f} Box={2:.3f} Count={3:d} Score={4:.3f}".format(ref,gs,gb,gm,gn)) 
         plt.imshow(hst), plotbxy(s0x,s0y), plotbxy(s1x,s1y), plotbxy(s2x,s2y), plotbxy(s3x,s3y), plt.show()
     return gs, gn
@@ -557,26 +564,24 @@ def find_gate_roi(gray, img_name= None):
     # plt.plot(sum_y), plt.plot(sum_x), plt.show()
     # plt.imshow(hst), plt.show()
 
-    hgt_y = np.average(sum_y) *.75
+    hgt_y = max(sum_y)/5
     pinf_x = find_peaks(sum_y, height=hgt_y, distance=2, prominence=1)
     peak_xi, prom_x = pinf_x[0], pinf_x[1]['prominences']
     psrt_xs = np.flip(np.argsort(prom_x))
     peak_x = peak_xi[psrt_xs]
 
-    hgt_x = np.average(sum_x) *.75
+    hgt_x = max(sum_y)/5
     pinf_y = find_peaks(sum_x, height=hgt_x, distance=2, prominence=1)
     peak_yi, prom_y = pinf_y[0], pinf_y[1]['prominences']
     psrt_ys = np.flip(np.argsort(prom_y))
     peak_y = peak_yi[psrt_ys]
 
     # Sanity check in case the image has no blobs
-    if peak_yi.size < 1 or peak_xi.size <1:
+    if peak_yi.size < 2 or peak_xi.size <2:
         return None, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
-    
+
     # Keep the largest 2 peaks and include the next most prominant peak
     if 2 < peak_xi.size:
-        psrt_xs = np.flip(np.argsort(prom_x))
-        peak_x = peak_xi[psrt_xs]
         phgt_x = pinf_x[1]["peak_heights"]
         phgt_xs= np.argsort(phgt_x)
         p2h_x = peak_xi[phgt_xs[-2:]]
@@ -584,8 +589,6 @@ def find_gate_roi(gray, img_name= None):
         peak_x= np.append(p2h_x, prm_x[0])
 
     if 2 < peak_yi.size:
-        psrt_ys = np.flip(np.argsort(prom_y))
-        peak_y = peak_yi[psrt_ys]
         phgt_y = pinf_y[1]["peak_heights"]
         phgt_ys= np.argsort(phgt_y)
         p2h_y = peak_yi[phgt_ys[-2:]]
@@ -605,7 +608,7 @@ def find_gate_roi(gray, img_name= None):
     if 2 < peak_x.size:
         ps = np.sort(peak_x[:2])
         if ps[0] < peak_x[2] and peak_x[2] < ps[1]:
-            peak_xh = pinf_y[1]["peak_heights"][psrt_ys]
+            peak_xh = pinf_x[1]["peak_heights"][psrt_xs]
             ps = np.sort(peak_xh[:2])
             if peak_xh[2] < ps[0] and peak_xh[2] < ps[1]:
                 peak_x = peak_x[:2]
@@ -631,6 +634,7 @@ def find_gate_roi(gray, img_name= None):
     gs, gn = gsa[gi], gna[gi]
     gix, giy = gi // len(cby), gi % len(cby)
     gx, gy = np.sort(peak_x[cbx[gix]]), np.sort(peak_y[cby[giy]])
+
     #print("Gate score({0:d}) = {1:.2f}".format(gi,gn))
     #plt.imshow(hst), plotbxy(gx,gy),  plt.show()
     ##### Find the RIO that most likely represents a square arrangement of features #####
@@ -1098,11 +1102,10 @@ def my_prediction(img, img_name= None):
         g2 = line_intersection(top_l, rhs_l)
         g3 = line_intersection(btm_l, rhs_l)
         g4 = line_intersection(btm_l, lhs_l)
-        bb0 = bb ##//
         bb = np.array([g1, g2, g3, g4])
 
-##xx        if False: ##$$
-        if True:
+        if False:
+#        if True: ##
             pwx, pwy = int(3*gws[0]), int(3*gws[1])
             bx,by = np.uint32([bb[0,0],bb[2,0]]), np.uint32([bb[0,1],bb[2,1]])
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
