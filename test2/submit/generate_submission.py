@@ -26,24 +26,39 @@ img_keys = [img_i.split(os.sep)[-1] for img_i in img_file]
 
 def UseTrainingImages(qty=20):
     global img_keys; data_ofs = 0
-    #data_ofs = img_keys.index('IMG_0013.JPG')  # large + litle glare
+    data_ofs = img_keys.index('IMG_0013.JPG')  # large + litle glare
     #data_ofs = img_keys.index('IMG_3565.JPG') # small 
-    ## data_ofs = img_keys.index('IMG_4443.JPG') # + ladders
-    data_ofs = img_keys.index('IMG_4746.JPG') # + ladders + glare + angle left
-    data_ofs = img_keys.index('IMG_9180.JPG')  # + angle + partial gates
+    #data_ofs = img_keys.index('IMG_4443.JPG') # + ladders
+    ### data_ofs = img_keys.index('IMG_4746.JPG') # + ladders + glare + angle left
+    ### data_ofs = img_keys.index('IMG_9180.JPG')  # + angle + partial gates
     #data_ofs = img_keys.index('IMG_0638.JPG')  # large + angle
 
     data_ofs = img_keys.index('IMG_4759.JPG')  # large + angle
-    data_ofs = img_keys.index('IMG_4761.JPG')  # large + angle
-    data_ofs = img_keys.index('IMG_4762.JPG')  # large + angle
     #data_ofs = img_keys.index('IMG_0711.JPG') # small + angle
     #data_ofs = img_keys.index('IMG_1625.JPG') ## no gate, 492, 5199
     data_ofs = img_keys.index('IMG_9008.JPG')  # large + angle
 
+    # todo:
+    ## data_ofs = img_keys.index('IMG_4761.JPG')  # Clipped by Histogram !! fix it
+    ## data_ofs = img_keys.index('IMG_4746.JPG')  # Cant find gate -fixe histogram -> clipp off weaker side
+    
     #data_ofs = img_keys.index('IMG_3574.JPG')
+    #data_ofs = img_keys.index('IMG_9008.JPG')
+    #data_ofs = img_keys.index('IMG_9011.JPG')
     img_keys = img_keys[data_ofs: data_ofs + qty]
 
-UseTrainingImages()
+
+#UseTrainingImages()
+if False:
+#if True:
+    img_keys = []
+    img_keys += ['IMG_0711.JPG']   # split-dec
+    img_keys += ['IMG_9011.JPG']   # saturated
+    img_keys += ['IMG_4443.JPG']   # ladders
+    img_keys += ['IMG_0013.JPG']   # large
+    img_keys += ['IMG_0716.JPG']   # small angle
+    img_keys += ['IMG_0638.JPG']   # angle
+
 
 # Instantiate a new detector
 finalDetector = GenerateFinalDetections()

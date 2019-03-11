@@ -35,12 +35,15 @@ class mAPScorer():
             if img_key in pred_data.keys():
                 pred_box = pred_data[img_key]
             else:
-                pred_box = []
+                pred_box = [[]]
+            # if a ground truth box is present
+            if not pred_box:
+                pred_box = [[]]
             #if a ground predicitons are present:
-            if (len(pred_box) > 0):
+            if (len(pred_box[0]) > 0):
                 tp_fp_cf_i = self.metrics(
                                           np.array(GT_box),
-                                          np.array(pred_box), self.THRESHOLD)
+                                          np.array(pred_box), self.THRESHOLD, img_key)
                 tp_fp_cf += tp_fp_cf_i
         mAP, mAP_points = self.map_eleven(tp_fp_cf, n_GT)
         return mAP, mAP_points
@@ -65,13 +68,14 @@ class mAPScorer():
                 pred_box = pred_data[img_key]
             else:
                 pred_box = [[]]
-            # if a ground truth box is presen
-
-            if (len(pred_box) > 0) :
+            # if a ground truth box is present
+            if not pred_box:
+                pred_box = [[]]
+            if (len(pred_box[0]) > 0) :
                 tp_fp_cf_i = self.metrics(
                                           np.array(GT_box),
                                           np.array(pred_box),
-                                          IOU_threshold)
+                                          IOU_threshold, img_key)
                 tp_fp_cf += tp_fp_cf_i
         mAP, mAP_points = self.map_eleven(np.array(tp_fp_cf), n_GT)
         return mAP
@@ -82,7 +86,7 @@ class mAPScorer():
             n += len(dict_[key])
         return n
 
-    def metrics(self, truth_boxes, test_boxes, IOU_threshold):
+    def metrics(self, truth_boxes, test_boxes, IOU_threshold, file_name):
         # all should be numpy arrays
         # truth box is 1x8: [x1,y1...x4, y4]
         # test_boxes is Nx9: [x1,y1... x4, y4, confidence]
@@ -93,13 +97,13 @@ class mAPScorer():
         m, n = truth_boxes.shape
         if n == 0:
             tp_fp_cf[:, 1] = 1
-            tp_fp_cf[:, 2] = np.array([666])  # // np.array(test_boxes)[:, -1]
+            tp_fp_cf[:, 2] = np.array(test_boxes)[:, -1]
             return tp_fp_cf.tolist()
         # tp, fp, confidence
         # assign all boxes as false positives
         # Test which boxes detect given GT box.
         tp_fp_cf[:, 1] = 1
-        tp_fp_cf[:, 2] = np.array([666]) ##// np.array(test_boxes)[:, -1]
+        tp_fp_cf[:, 2] = np.array(test_boxes)[:, -1]
         for truth_box in truth_boxes:
             # for each ground truth box,
             # compute max IOU, and check if maxIOU>threshold,
@@ -109,12 +113,9 @@ class mAPScorer():
             for test_box in test_boxes:
                 # if box is already assigned,
                 # tp_fp_cf[box_id,1]=0, so dont use it
-                if 8 <= test_box.shape[0]:      ##//
-                    iou_box = self.calculate_iou(
+                iou_box = self.calculate_iou(
                                              truth_poly,
-                                             self.create_poly(test_box[0:8]))
-                else:
-                    iou_box = 0  ##//
+                                             self.create_poly(test_box[0: 8]))
                 ious.append(tp_fp_cf[box_id, 1] * iou_box)
                 box_id += 1
             max_iou = np.max(ious)
@@ -122,6 +123,11 @@ class mAPScorer():
             if (max_iou > IOU_threshold):
                 tp_fp_cf[argmax_iou, 0] = 1
                 tp_fp_cf[argmax_iou, 1] = 0
+
+        outp = "\"" + file_name + "\" , " + str(iou_box)
+        print(outp)
+#        with open("./score_details.csv", 'a') as f:
+#            f.write(outp)
         return tp_fp_cf.tolist()
 
     def map_eleven(self, tp_fp_cf, total_truths):
@@ -139,6 +145,8 @@ class mAPScorer():
         recalls_thresholds[-1] = 0.9999
         map_ = 0
         map_all = []
+        print("")
+        print("file, score")
         for thresh in recalls_thresholds:
             indexs = np.where(rec >= thresh)
             if len(indexs[0]) > 0:

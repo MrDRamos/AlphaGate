@@ -5,7 +5,6 @@ import os
 import json
 import cv2
 import numpy as np
-import sys
 
 # Implement a function that takes an image as an input, performs any preprocessing steps and outputs a list of bounding box detections and assosciated confidence score. 
 from matplotlib import pyplot as plt
@@ -69,7 +68,7 @@ def Sobel_SplitPosNeg(img, Horizontal=True, ksize=3, UseScharr= False):
         nstat = cv2.minMaxLoc(neg_grad); print(nstat)
         pstat = cv2.minMaxLoc(pos_grad); print(pstat)
         plt.subplot(1,3,1), plt.imshow(img_grad, 'gray'), plt.title('Float-gradiant')
-        plt.subplot(1,3,2), plt.imshow(neg_grad, 'gray'), plt.title('NegU8-gradiant')
+        plt.subplot(1,3,2), plt.imshow(neg_grad, 'gray'), plt.title('NegU8-gradiant')        
         plt.subplot(1,3,3), plt.imshow(pos_grad, 'gray'), plt.title('PosU8-gradiant')
         plt.show()
     return neg_grad, pos_grad
@@ -105,31 +104,17 @@ def get_corners_xy(img, maxCorners=128):
     qualityLevel = 0.1 # Parameter characterizing the minimal accepted quality of image corners
     minDistance = 6    # Minimum possible Euclidean distance between the returned corners
     blockSize = 3      # Default =3, Size of an average block for computing a derivative covariation matrix over each pixel neighborhood
+
+    scale_intensity(img, 5, img) ##//
+    #maxCorners = 400 ##//
     CornerS = cv2.goodFeaturesToTrack(img, maxCorners, qualityLevel, minDistance, blockSize=blockSize)
     # Try FAST feature detection
     # https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_feature2d/py_fast/py_fast.html
 
     dbg_show = False
-#    dbg_show = True
+###    dbg_show = True
     if dbg_show:
-        # Initiate FAST object with default values
-        fast = cv2.FastFeatureDetector()
-
-        # find and draw the keypoints
-        try:
-            kp = fast.detect(gray,None)
-            img2 = cv2.drawKeypoints(img, kp, color=(255,0,0))
-            # Print all default params
-            print( "Threshold: ", fast.getInt('threshold'))
-            print( "nonmaxSuppression: ", fast.getBool('nonmaxSuppression'))
-            print( "neighborhood: ", fast.getInt('type'))
- #           print( "Total Keypoints with nonmaxSuppression: ", len(kp){})
-        except:
-            print("Unexpected error:", sys.exc_info()[0])
-
-    dbg_show = False
-#    dbg_show = True
-    if dbg_show:
+        print("corners = {0:}".format(CornerS.shape[0]))
         img_abs = convert2absU8(img)
         img_rgb = cv2.cvtColor(img_abs, cv2.COLOR_GRAY2RGB)
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 5.0)
@@ -273,7 +258,7 @@ def hst_filter(hst, img_name= None):
     # create tmp working copy of hst with 2 extra cols for 0-padding
     hst_flt = np.zeros((hst.shape[0]+4, hst.shape[1]+4), hst.dtype)
     hst_flt[2:-2,2:-2] = np.copy(hst)
-    #plt.subplot(1,2,1), plt.imshow(hst_flt), plt.subplot(1,2,2), plt.imshow(hst), plt.show() 
+    #plt.subplot(1,2,1), plt.imshow(hst_flt), plt.subplot(1,2,2), plt.imshow(hst), plt.show()
     hst_01 = hst_flt.clip(max=1)
 
     flt = np.zeros_like(hst_01)
@@ -454,15 +439,76 @@ def hst_filter(hst, img_name= None):
     ########## Histogtam blob Filters ##########
 
     
+def gate_side_score(gx, gy, hst, ref):
+    # Gate dim: inside = 8, out = 11 ->  width = 3/2 * /((8+11)/2) = 3/19
+    glen = np.array([ gx[1] - gx[0], gy[1] - gy[0] ])
+    # Gate-width propoertions
+    gwp = glen * 3.0 / 19
+    gwx, gwy = int((2*gwp[0] + gwp[1])/3 +1.5), int((gwp[0] + 2*gwp[1])/3 +1.5)
+
+    # Define a genrous patch around each side
+    mx, my = hst.shape[1], hst.shape[0]
+    s0x, s0y = [max(0, gx[0]-gwx), min(gx[1]+gwx, mx)] , [max(0, gy[0]-gwy), min(gy[0]+gwy, my)]
+    s1x, s1y = [max(0, gx[1]-gwx), min(gx[1]+gwx, mx)] , [max(0, gy[0]-gwy), min(gy[1]+gwy, my)]
+    s2x, s2y = [max(0, gx[0]-gwx), min(gx[1]+gwx, mx)] , [max(0, gy[1]-gwy), min(gy[1]+gwy, my)]
+    s3x, s3y = [max(0, gx[0]-gwx), min(gx[0]+gwx, mx)] , [max(0, gy[0]-gwy), min(gy[1]+gwy, my)]
+
+    # Count side weights: The upper, lower half are counted seperatly
+    sdx, sdy = int((s0x[1] - s0x[0] + 0.5)/2), int((s1y[1] - s1y[0] + 0.5)/2) # half length
+    s0c = [ np.sum(hst[s0y[0]:s0y[1], s0x[0] :s0x[0]+sdx]), 
+            np.sum(hst[s0y[0]:s0y[1], s0x[1]-sdx :s0x[1]]) ]
+    s1c = [ np.sum(hst[s1y[0]:s1y[0] +sdy, s1x[0]:s1x[1]]), 
+            np.sum(hst[s1y[1]-sdy :s1y[1], s1x[0]:s1x[1]]) ]
+    s2c = [ np.sum(hst[s2y[0]:s2y[1], s2x[0] :s2x[0]+ sdx]), 
+            np.sum(hst[s2y[0]:s2y[1], s2x[1]-sdx: s2x[1]]) ]
+    s3c = [ np.sum(hst[s3y[0]: s3y[0]+sdy, s3x[0]:s3x[1]]), 
+            np.sum(hst[s3y[1]-sdy :s3y[1], s3x[0]:s3x[1]]) ]
+    s0n= s0c[0]+s0c[1]
+    s1n= s1c[0]+s1c[1]
+    s2n= s2c[0]+s2c[1]
+    s3n= s3c[0]+s3c[1]
+    
+    # Compute side scores [0..1] 1:= when both halfs of a side are equally populated
+    s0 = s1 = s2 =s3 = 0    
+    if 0 < s0n:
+        s0 = s0c[0]*s0c[1]*4/(s0n**2)
+    if 0 < s1n:   
+        s1 = s1c[0]*s1c[1]*4/(s1n**2)
+    if 0 < s2n:   
+        s2 = s2c[0]*s2c[1]*4/(s2n**2)
+    if 0 < s3n:   
+        s3 = s3c[0]*s3c[1]*4/(s3n**2)
+
+    gm = s0n+ s1n+ s2n + s3n # accumlated count over all 4 sides
+    # Error from expected side count: = 1 If the features are equaly distibuted to all sides
+    s0e = max(0,1-4*(s0n/gm - 0.25)**2)
+    s1e = max(0,1-4*(s1n/gm - 0.25)**2)
+    s2e = max(0,1-4*(s2n/gm - 0.25)**2)
+    s3e = max(0,1-4*(s3n/gm - 0.25)**2)
+
+    #Side Score: The fractional number of 4 sides. e.g 2sides->0.5, 3side->.75
+    gs = s0 + s1 +s2 + s3
+    #Gate box Score: weighted(for equal distribution) avarege side score
+    gb = (s0 * s0e + s1 * s1e + s2 * s2e + s3 * s3e) / 4
+    
+    # This is a hack to reduce feature noise in the large horizontal image range
+    skew=1
+    if glen[1] < glen[0]:
+        skew = glen[1]/glen[0]
+        #print("skew ====== {0:.3f}".format(skew))
+
+    #Combined Gate score
+    gn = gb * gm * gs * skew
+
+    if False:
+#    if True:
+        print("{0:d} Sides= {1:.3f} Box={2:.3f} Count={3:d} Score={4:.3f}".format(ref,gs,gb,gm,gn)) 
+        plt.imshow(hst), plotbxy(s0x,s0y), plotbxy(s1x,s1y), plotbxy(s2x,s2y), plotbxy(s3x,s3y), plt.show()
+    return gs, gn
+
+
 
 def find_gate_roi(gray, img_name= None):
-	
-    blur = cv2.GaussianBlur(gray,(7,7),0)
-    ret, gray = cv2.threshold(blur,125,255,cv2.THRESH_TOZERO+cv2.THRESH_OTSU)
- #   plt.subplot(111), plt.imshow(gray, cmap='gray'), plt.xticks([]), plt.yticks([]), plt.title("Binary-Otsu Threshold")
- #   plt.show()
- 
- 
     # Extract edge features
     maxCorners  = 250 #128  at lead 40/corner + Top/Btm AIRR Lables + some outliers which we will have to filter
     ksize = 3   # kernal size
@@ -503,82 +549,142 @@ def find_gate_roi(gray, img_name= None):
     hst = hst.astype(np.uint8)
     
     #### Remove small unconnected bins from the histogram ####
-    hst, hst_01 = hst_filter(hst)
+    if False:
+##    if True:
+        _hst, hst_01 = hst_filter(hst)
+        plt.subplot(1,2,1), plt.imshow(hst), plt.subplot(1,2,2), plt.imshow(_hst), plt.show()
+        hst = _hst
+    else:
+        hst, hst_01 = hst_filter(hst)
 
 
-    #### find the predominant blob ####
-    filtsize = 5
-    hsumy, hsumx = np.sum(hst_01, axis=0), np.sum(hst_01, axis=1)
-    # plt.plot(hsumy), plt.plot(hsumx), plt.show()
-    hsumy, hsumx = maximum_filter1d(hsumy, size=filtsize), maximum_filter1d(hsumx, size=filtsize)
-    hsumx[0] = hsumy[0] = hsumx[hsumx.size - 1] = hsumy[hsumy.size - 1] = 0 # make sure the borders are included
-    # plt.plot(hsumy), plt.plot(hsumx), plt.show()
-    xmax = find_peaks(hsumy)[0]
-    ymax = find_peaks(hsumx)[0]
+    ##### Find an RIO that most likely represents a square arrangement of features #####
+    sum_y, sum_x = np.sum(hst, axis=0), np.sum(hst, axis=1)
+    sum_x[0] = sum_y[0] = sum_x[sum_x.size - 1] = sum_y[sum_y.size - 1] = 0 # make sure the borders are included
+    # plt.plot(sum_y), plt.plot(sum_x), plt.show()
+    # plt.imshow(hst), plt.show()
+
+    hgt_y = max(sum_y)/5
+    pinf_x = find_peaks(sum_y, height=hgt_y, distance=2, prominence=1)
+    peak_xi, prom_x = pinf_x[0], pinf_x[1]['prominences']
+    psrt_xs = np.flip(np.argsort(prom_x))
+    peak_x = peak_xi[psrt_xs]
+
+    hgt_x = max(sum_y)/5
+    pinf_y = find_peaks(sum_x, height=hgt_x, distance=2, prominence=1)
+    peak_yi, prom_y = pinf_y[0], pinf_y[1]['prominences']
+    psrt_ys = np.flip(np.argsort(prom_y))
+    peak_y = peak_yi[psrt_ys]
 
     # Sanity check in case the image has no blobs
-    if 0 == xmax.size or 0 == ymax.size:
-        return None, None, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
+    if peak_yi.size < 2 or peak_xi.size <2:
+        return None, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
 
-    psumy, psumx = hsumy[xmax], hsumx[ymax]  # get the corresponding peak values
-    xsrt, ysrt = np.argsort(psumy), np.argsort(psumx)  # get array to sort by peaks
-    # we want coordinates of the largest 2 peaks
-    px = np.array([xmax[xsrt[xsrt.size - 2]], xmax[xsrt[xsrt.size - 1]]])
-    py = np.array([ymax[ysrt[ysrt.size - 2]], ymax[ysrt[ysrt.size - 1]]])
-    px, py = np.sort(px), np.sort(py)  # sort the coord from low to high
-    # plt.imshow(hst_01), plt.show()
+    # Keep the largest 2 peaks and include the next most prominant peak
+    if 2 < peak_xi.size:
+        phgt_x = pinf_x[1]["peak_heights"]
+        phgt_xs= np.argsort(phgt_x)
+        p2h_x = peak_xi[phgt_xs[-2:]]
+        prm_x = peak_x[np.logical_and(peak_x!=p2h_x[0] ,peak_x!=p2h_x[1])]
+        peak_x= np.append(p2h_x, prm_x[0])
 
-    # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
-    span = hsumy[px[0]:px[1]]
-    zeros = len([w for w in span if w == 0])
-    pr = px
-    psum = hsumy
-    if max(0,span.size - filtsize) < 3 * zeros:
-        pc = xmax[xsrt[xsrt.size - 1]]  #pm = xmax[xmax.size - 1]        
-        pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
-        pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+    if 2 < peak_yi.size:
+        phgt_y = pinf_y[1]["peak_heights"]
+        phgt_ys= np.argsort(phgt_y)
+        p2h_y = peak_yi[phgt_ys[-2:]]
+        prm_y = peak_y[np.logical_and(peak_y!=p2h_y[0] ,peak_y!=p2h_y[1])]
+        peak_y= np.append(p2h_y, prm_y[0])
+
+
+    # remove the 3d peak if its between the 2 prominent ones and is less in height
+    if 2 < peak_y.size:
+        ps = np.sort(peak_y[:2])
+        if ps[0] < peak_y[2] and peak_y[2] < ps[1]:
+            peak_yh = pinf_y[1]["peak_heights"][psrt_ys]
+            ps = np.sort(peak_yh[:2])
+            if peak_yh[2] < ps[0] and peak_yh[2] < ps[1]:
+                peak_y = peak_y[:2]
+
+    if 2 < peak_x.size:
+        ps = np.sort(peak_x[:2])
+        if ps[0] < peak_x[2] and peak_x[2] < ps[1]:
+            peak_xh = pinf_x[1]["peak_heights"][psrt_xs]
+            ps = np.sort(peak_xh[:2])
+            if peak_xh[2] < ps[0] and peak_xh[2] < ps[1]:
+                peak_x = peak_x[:2]
+
+    if 2 < peak_x.size:
+        cbx = [[0,1],[0,2],[1,2]]
     else:
-        if 0 == zeros:
-            pc = pr[0]
-            pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
-            pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
-    hst_01[:,:pr[0]] = 0
-    hst_01[:, pr[1]:] = 0
-    # plt.imshow(hst_01), plt.show()
-
-    # If the gap between the 2 peeks has more 0's than data, then filter out the "strongest" peak
-    span = hsumx[py[0]:py[1]]
-    zeros = len([w for w in span if w == 0])
-    pr = py
-    psum = hsumx
-    if max(0,span.size - filtsize) < 3 * zeros:
-        pc = ymax[ysrt[ysrt.size - 1]]  #ymax[ymax.size - 1]
-        pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
-        pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
+        cbx = [[0,1]]
+    if 2 < peak_y.size:
+        cby = [[0,1],[0,2],[1,2]]
     else:
-        if 0 == zeros:
-            pc = pr[1]
-            pr[0] = pc - np.flip(psum[0:pc]).argmin(axis=0)
-            pr[1] = pc + psum[pc:psum.size].argmin(axis=0)
-    hst_01[:pr[0], :] = 0
-    hst_01[pr[1]:, :] = 0
+        cby = [[0,1]]
+
+    gsa = [0,0,0,0,0,0,0,0,0]
+    gna = [0,0,0,0,0,0,0,0,0]
+    gi = 0
+    for cbxi in cbx:
+        for cbyi in cby:
+            gx, gy = np.sort(peak_x[cbxi]), np.sort(peak_y[cbyi])
+            gsa[gi], gna[gi] = gate_side_score(gx, gy, hst, gi)
+            gi += 1
+    gi = np.flip(np.argsort(gna))[0]
+    gs, gn = gsa[gi], gna[gi]
+    gix, giy = gi // len(cby), gi % len(cby)
+    gx, gy = np.sort(peak_x[cbx[gix]]), np.sort(peak_y[cby[giy]])
+
+    #print("Gate score({0:d}) = {1:.2f}".format(gi,gn))
+    #plt.imshow(hst), plotbxy(gx,gy),  plt.show()
+    ##### Find the RIO that most likely represents a square arrangement of features #####
+
+
+    # Truncate the histogram to the RIO we just found
+    # Gate dim: inside = 8, out = 11 ->  width = 3/2 * /((8+11)/2) = 3/19
+    glen = np.array([ gx[1] - gx[0], gy[1] - gy[0] ])
+    # Gate-width propoertions
+    gwp = glen * 3.0 / 19
+    gwx, gwy = int((2*gwp[0] + gwp[1])/3 +2.5), int((gwp[0] + 2*gwp[1])/3 +2.5)
+    hst_01[:, :max(0,gx[0]-gwx)] = 0
+    hst_01[:, min(gx[1]+gwx, hst_01.shape[1]):] = 0
+    hst_01[:max(0,gy[0]-gwy), :] = 0
+    hst_01[min(gy[1]+gwy, hst_01.shape[0]):, :] = 0
     # plt.imshow(hst_01), plt.show()
-
-
-    # Filter the selected gate edges based on the innew & outer edges of the final 2D hst
-    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.moment.html#scipy.stats.moment
     hst_flt = np.multiply(hst_01, hst)
-    wsumy, wsumx = np.sum(hst_flt, axis=0), np.sum(hst_flt, axis=1)
+    # plt.imshow(hst_01), plt.show()
 
-    peaks = find_peaks(wsumy, prominence=1)
-    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
-    if 1 < pmax.size:
-        px = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+    # Do a final edge histogram after all cleanup from the prior stage
+    sum_y, sum_x = np.sum(hst_flt, axis=0), np.sum(hst_flt, axis=1)
+    sum_x[0] = sum_y[0] = sum_x[sum_x.size - 1] = sum_y[sum_y.size - 1] = 0 # make sure the borders are included
 
-    peaks = find_peaks(wsumx, prominence=1)
-    pmax, psrt = peaks[0], np.argsort(peaks[1]['prominences'])
-    if 1 < pmax.size:
-        py = np.array([pmax[psrt[psrt.size - 2]], pmax[psrt[psrt.size - 1]]])
+    px, py = gx, gy
+
+    hgt_y = np.average(sum_y)/2
+    pinf_x = find_peaks(sum_y, height=hgt_y, distance=gwx//2, prominence=1)
+    peak_xi, prom_x = pinf_x[0], pinf_x[1]['prominences']
+    psrt_xs = np.flip(np.argsort(prom_x))
+    peak_x = peak_xi[psrt_xs]
+    # Use the new estimate unless its to far away from the first est. e.g. because we did not filter out center peaks
+    if 1 < peak_x.size:
+        px = np.sort(peak_x[:2])
+        if gwx < abs(px[0] - gx[0]):
+            px[0] = gx[0]
+        if gwx < abs(px[1] - gx[1]):
+            px[1] = gx[1]
+
+    hgt_x = np.average(sum_x)/2
+    pinf_y = find_peaks(sum_x, height=hgt_y, distance=gwy//2, prominence=1)
+    peak_yi, prom_y = pinf_y[0], pinf_y[1]['prominences']
+    psrt_ys = np.flip(np.argsort(prom_y))
+    peak_y = peak_yi[psrt_ys]
+    # Use the new estimate unless its to far away from the first est. e.g. because we did not filter out center peaks
+    if 1 < peak_y.size:
+        py = np.sort(peak_y[:2])
+        if gwy < abs(py[0] - gy[0]):
+            py[0] = gy[0]
+        if gwy < abs(py[1] - gy[1]):
+            py[1] = gy[1]
 
     px, py = np.sort(px), np.sort(py) # sort the coord from low to high
     medx, medy = (px[0] + px[1])/2.0, (py[0] + py[1])/2.0
@@ -586,7 +692,7 @@ def find_gate_roi(gray, img_name= None):
 
 
     if False:
-        ##xx    if True:
+#    if True:
         chout = np.array([ [px[0], py[0]], [px[1], py[0]], [px[1], py[1]], [px[0], py[1]] ])
         cx, cy = int((medx +0.5) * pixelsPerBin), int((medy + 0.5) * pixelsPerBin)
         cout = (chout + 0.5) * pixelsPerBin
@@ -610,24 +716,30 @@ def find_gate_roi(gray, img_name= None):
     Run this step after find_gate_roi() returns a rough rectangular box ROI.
     We refine the Histogram ROI which only has a resolution of 20 pixels (=pixelsPerBin)
     We generate a large enough patch around each corner and use it to filter out the edge
-    features within that corner patch. We then compute compute the center of mass for 
-    each corner using the feature point coordinates.
+    features within that corner patch. We then compute the center of mass for 
+    each corner using its feature point coordinates.
     The final resolution is no longer dependent on the pixelsPerBin!
     """
     # Gate dim: inside = 8, out = 11 ->  width = 3/2 * /((8+11)/2) = 3/19
     gdx, gdy = gx[1] - gx[0], gy[1] - gy[0]
+    wx, wy = int(gdx * 3/19), int(gdy * 3/19)  # Gate width
     gfx = gfy = 1
     if 1.5*gdx < gdy:
-        gfx, gfy = 1.5, 2
+        gfx, gfy = 1.25, 2
     elif 1.5*gdy < gdx:
-        gfx, gfy = 2, 1.5
-    wx, wy = int(gdx * 3/19), int(gdy * 3/19)  # Gate width
+        gfx, gfy = 2, 1.25
     dwxp, dwyp = int(pixelsPerBin + gfx * wx), int(pixelsPerBin + gfy * wy)
-    dwxn, dwyn = int(pixelsPerBin + 1.5 * wx), int(pixelsPerBin + 1.5 * wy)
+    dwxn, dwyn = int(pixelsPerBin + 1.25 * wx), int(pixelsPerBin + 1.25 * wy)
     rx, ry = [max(0, gx[0] - dwxp), min(gray.shape[1], gx[1] + dwxp)], [max(0, gy[0] - dwyp), min(gray.shape[0], gy[1] + dwyp)]
 
-    # Define a genrous patch around each corner. Try to avoid the center which distorts the results
+    # Define a generous patch around each corner. Try to avoid the center which distorts the results
     dx, dy = dwxp +dwxn, dwyp + dwyn
+    lx2, ly2 = int((rx[1]- rx[0])/2 + 0.5), int((ry[1]-ry[0])/2 + 0.5)
+    if lx2 < dx: # Don't extend the box beyond the center
+        dx = lx2
+    if ly2 < dy:
+        dy = ly2
+
     e0x, e0y = np.array([rx[0], rx[0] + dx]), np.array([ry[0], ry[0] + dy])
     e1x, e1y = np.array([rx[1] -dx, rx[1]]), np.array([ry[0], ry[0] +dy])
     e2x, e2y = np.array([rx[1] -dx, rx[1]]), np.array([ry[1] -dy, ry[1]])
@@ -657,10 +769,11 @@ def find_gate_roi(gray, img_name= None):
         ep3 = np.average(ept3[:,0]), np.average(ept3[:,1])
     else:
         ep3 = gx[0], gy[1]
+    # Final 4 point bounding box
     bb = np.array([ep0, ep1, ep2, ep3])
 
-#    if False:
-    if True:
+    if False: # Show gray, Initial Hist ROI, Refined BB-Corners + EdgeFeatures
+#    if True:
         img_r = gray[ry[0]:ry[1], rx[0]:rx[1]]
         bx, by = gx - rx[0], gy - ry[0]
         plt.imshow(img_r, "gray"), plotbxy(bx, by)
@@ -683,7 +796,7 @@ def find_gate_roi(gray, img_name= None):
 
         plt.show()
    
-    return gx, gy, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
+    return bb, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos)
 
 
 def find_gate_edge(ax, ay, rx, ry, rw, img_p, img_n, axis, posdir, gray, img_name= None):
@@ -708,6 +821,7 @@ def find_gate_edge(ax, ay, rx, ry, rw, img_p, img_n, axis, posdir, gray, img_nam
 
     hst_p = img_p[ry[0]:ry[1], rx[0]:rx[1]]
     sum_p = np.sum(hst_p, axis=axis)
+    sum_p[sum_p.size-1] = 0 # force find_peaks() to onsider the bondery
     hgt_p = np.average(sum_p)*2
     pinf_p = find_peaks(sum_p, height=hgt_p, prominence=1)
     peak_p, psrt_p = pinf_p[0], pinf_p[1]['prominences']
@@ -718,15 +832,14 @@ def find_gate_edge(ax, ay, rx, ry, rw, img_p, img_n, axis, posdir, gray, img_nam
     pinf_n = find_peaks(sum_n, height=hgt_n, prominence=1)
     peak_n, psrt_n = pinf_n[0], pinf_n[1]['prominences']
     
-    # plt.subplot(2,2,1), plt.plot(sum_p)  , plt.subplot(2,2,2), plt.plot(sum_n) #plt.show()
-    # plt.subplot(2,2,3), plt.imshow(hst_p), plt.subplot(2,2,4), plt.imshow(hst_n), plt.show()
+    #plt.subplot(2,2,1), plt.plot(sum_p), plt.subplot(2,2,2), plt.plot(sum_n), plt.show(), plt.subplot(2, 2, 3), plt.imshow(hst_p), plt.subplot(2, 2, 4), plt.imshow(hst_n), plt.show()
     avg_p = cum_p = 0
     if 0 < peak_p.size:   
         avg_p = np.sum(np.multiply(peak_p, sum_p[peak_p]))
         cum_p = np.sum(sum_p[peak_p])
     if 0 < peak_n.size:   
-        avg_p = np.sum(np.multiply(peak_n, sum_n[peak_n]))
-        cum_p = np.sum(sum_n[peak_n])
+        avg_p += np.sum(np.multiply(peak_n, sum_n[peak_n]))
+        cum_p += np.sum(sum_n[peak_n])
     if 0 < cum_p:
         avg_p /= cum_p
         if posdir:
@@ -785,7 +898,7 @@ def my_prediction(img, img_name= None):
         plt.subplot(1, 2, 2), plt.imshow(gray_new)
         plt.show()
 
-    ############## Keep, This realy helps !! ############
+    ############## Do any of these helps ? ############
     # Clipp highest intensities(Light bulbs & fixtures) to improve gradiants at lower intensities
 #    if False:
     if True:
@@ -798,141 +911,178 @@ def my_prediction(img, img_name= None):
         #gray = scale_intensity(gray, 255 / (255 - 20), dst=gray)
         #plt.imshow(gray, 'gray'), plt.title("gray - Preprocessed- Clip Max"), plt.show()
 
-    bx, by, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos) = find_gate_roi(gray, img_name)
-    if bx is None:
+    bb, (img_dxNeg, img_dxPos, img_dyNeg, img_dyPos) = find_gate_roi(gray, img_name)
+    if bb is None:
       return None
 
-    cx, cy = int((bx[0]+bx[1])/2), int((by[0]+by[1])/2)
-    if False:
-#    if True:       
+    if False: # Show 4 sobel's, gray & combined sobel
+#    if True:
         fig, axS = plt.subplots(2,3)
-        ax = axS.ravel()        
-        plotbxy(bx,by,win=ax[0]), plotcxy(cx,cy, win=ax[0])
-        ax[0].imshow(img_dxNeg, 'gray'), ax[0].set_title("-dX Sobel "+ img_name)
+        ax = axS.ravel()
 
-        plotbxy(bx,by,win=ax[1]), plotcxy(cx,cy, win=ax[1])
-        ax[1].imshow(img_dxPos, 'gray'), ax[1].set_title("+dX Sobel "+ img_name)
-
-        plotbxy(bx,by,win=ax[2]), plotcxy(cx,cy, win=ax[2])
-        ax[2].imshow(gray, 'gray'), ax[2].set_title(img_name)
-
-        plotbxy(bx,by,win=ax[3]), plotcxy(cx,cy, win=ax[3])
-        ax[3].imshow(img_dyNeg, 'gray'), ax[3].set_title("-dY Sobel "+ img_name)
-
-        plotbxy(bx,by,win=ax[4]), plotcxy(cx,cy, win=ax[4])
-        ax[4].imshow(img_dyPos, 'gray'), ax[4].set_title("+dY Sobel "+ img_name)
-
-        plotbxy(bx,by,win=ax[5]), plotcxy(cx,cy, win=ax[4])
         img_dx = np.add(img_dxPos, img_dxNeg)
         img_dy = np.add(img_dyPos, img_dyNeg)
         img_dxy = np.add(img_dx, img_dy)
+
+        plt_x, plt_y = bb[:, 0], bb[:, 1]
+        plt_x, plt_y = np.append(plt_x, plt_x[0]), np.append(plt_y, plt_y[0])
+
+        ax[0].plot(plt_x, plt_y, color="lime", linewidth=2)
+        ax[0].imshow(img_dxNeg, 'gray'), ax[0].set_title("-dX Sobel "+ img_name)
+
+        ax[1].plot(plt_x, plt_y, color="lime", linewidth=2)
+        ax[1].imshow(img_dxPos, 'gray'), ax[1].set_title("+dX Sobel "+ img_name)
+
+        ax[2].plot(plt_x, plt_y, color="lime", linewidth=2)
+        ax[2].imshow(gray, 'gray'), ax[2].set_title(img_name)
+
+        ax[3].plot(plt_x, plt_y, color="lime", linewidth=2)
+        ax[3].imshow(img_dyNeg, 'gray'), ax[3].set_title("-dY Sobel "+ img_name)
+
+        ax[4].plot(plt_x, plt_y, color="lime", linewidth=2)
+        ax[4].imshow(img_dyPos, 'gray'), ax[4].set_title("+dY Sobel "+ img_name)
+
+        ax[5].plot(plt_x, plt_y, color="lime", linewidth=2)
         ax[5].imshow(img_dxy, 'gray'), ax[4].set_title("+dY Sobel "+ img_name)
         plt.show()
 
-    
-    ### Find the exact gate corner positions by analyzing the sobel'd image
-    # Gate dim: inside = 8, out = 11 ->  width/2 = 3/2 * /((8+11)/2) = 3/19
-    dx, dy = (bx[1] - bx[0])/2.0 , (by[1] - by[0])/2.0 
-    wx, wy = 1+int(dx * 3 / 19), 1+int(dy * 3 / 19)  # Gate width/2
 
-#    if False: #This step takes an extra 20 ms    
-    if 3 < wx and 3 < wy: # Sanity check
-        ##//img_dx = np.add(img_dxNeg, img_dxPos)
-        ##//img_dy = np.add(img_dyNeg, img_dyPos)
+    # Gate dim: inside = 8', out = 11' ->  width = 3/2 * /((8+11)/2) = 3/19
+    # Gate-lengths, top=0, right=1 ...
+    glen = np.array( [bb[1, 0] - bb[0, 0], bb[2, 1] - bb[1, 1], bb[2, 0] - bb[3, 0], bb[3, 1] - bb[0, 1]] )
+    # Gate-width scale factor, top=0, right=1 ...
+    gws = glen * 3.0 / 19
+    gwx, gwy = (gws[0] + gws[2]) / 2, (gws[1] + gws[3]) / 2
+    gwx, gwy = (2*gwx + gwy)/3, (gwx + 2*gwy)/3
+    gw = np.array([gwy, gwx, gwy, gwx]) # note the inverted pattern
 
-        # estimate projected (scafolding width = 1)
-        if dx < dy:
-            cosa = dx / dy
-            wsx = int(dy / 9 * (1 - (cosa ** 2) / 2))
-            wsy = int(wsx/4)
+    if 6 < gw.min():  # Sanity check
+        # Estimate scafolding-width protruding into the inner gate region
+        if 1.25*gwx < gwy:
+            # scafolding-width 1' = 2/3 Gate-Width)
+            sw = gwy * 2.0/3
+            sw0 = sw2 = sw / 4
+            cosa = gwx / gwy
+            sina = 1 - (cosa ** 2) / 2  # range 0.5 .. 1
+            if glen[3] < glen[1]:
+                sw3 = sw * sina
+                sw1 = sw3
+                gw[1] *= 2-cosa
+                gw[3] = gwy * cosa
+            else:
+                sw1 = sw * sina
+                sw3 = sw1
+                gw[3] *= 2-cosa
+                gw[1] = gwy * cosa
+        elif 1.25*gwy < gwx:
+            sw = gwy * 2.0/3
+            sw1 = sw3 = sw / 4
+            cosa = gwx / gwy
+            sina = 1 - (cosa ** 2) / 2  # range 0.5 .. 1
+            if glen[0] < glen[2]:
+                sw0 = sw * sina
+                sw2 = sw0
+                gw[2] *= 2-cosa
+                gw[0] = gwx * cosa
+            else:
+                sw2 = sw * sina
+                sw0 = sw2
+                gw[0] *= 2-cosa
+                gw[2] = gwx * cosa
         else:
-            cosa = dy / dx
-            wsy = int(dx / 9 * (1 - (cosa ** 2) / 2))
-            wsx = int(wsy/4)
-        wx4, wy4 = wx//2, wy//2
-        gwx, gwy = 2*wx + wsx,  2*wy + wsy   # Max search length=  gate width + scafolding
-        vwxn,vwxp, vwy = 3*wx4,4*wx4+wsx,wy4 # -vwxn,+vwxp roi width added to anchor, vwy= +/-vertical range
-        hwyn,hwyp, hwx = 3*wy4,4*wy4+wsy,wx4 # -hwyn,+hwyp roi hight added to anchor, hwx= +/-horizonal range
+            sw0 = sw1 = sw2 = sw3 = min(gwx, gwy)/4
+        sw = np.uint32([sw0 + .5, sw1 + .5, sw2 + .5, sw3 + .5])
 
-        # The gate positions is only accurate to pixelsPerBin=20 from find_gate_roi()
-#        if False:
-        if True:
-            w4_pixelsPerBin=5 #20/4
-            if wx4 < w4_pixelsPerBin or wy4 < w4_pixelsPerBin:
-                pwx, pwy = w4_pixelsPerBin* 8, w4_pixelsPerBin * 8
-                pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
-                img_dx = np.add(img_dxNeg[pby[0]:pby[1], pbx[0]:pbx[1]], img_dxPos[pby[0]:pby[1], pbx[0]:pbx[1]])
-                img_dy = np.add(img_dyNeg[pby[0]:pby[1], pbx[0]:pbx[1]], img_dyPos[pby[0]:pby[1], pbx[0]:pbx[1]])
-                ##// img_d = np.add(img_dx, img_dy)
-                # plt.subplot(1, 2, 1), plt.imshow(img_dx), plt.subplot(1, 2, 2), plt.imshow(img_dy), plt.show()
-                sum_dx, sum_dy = np.sum(img_dy, axis=0), np.sum(img_dx, axis=1)
-                avg_x= np.average(np.arange(pbx[0],pbx[1]),weights=sum_dx)
-                avg_y= np.average(np.arange(pby[0],pby[1]),weights=sum_dy)
-                dcx, dcy = int(avg_x -cx+0.5), int(avg_y-cy+0.5)
-                bx, by = bx + dcx, by+ dcy
-                cx, cy = cx+ dcx, cy+dcy
-            if False:
-#            if True:
-                if wx4 < w4_pixelsPerBin:
-                    vwxn,vwxp = 6 * w4_pixelsPerBin, 5 * w4_pixelsPerBin
-                if wy4 < w4_pixelsPerBin:
-                    hwyn,hwyp = 6 * w4_pixelsPerBin, 5 * w4_pixelsPerBin
+        # +/= Patch width Gate-Width/4
+        pw = np.uint32(gws / 4 + 0.5)
+        # Patch length extending outward from the gate
+        pout = np.uint32(gw * .25 + 0.5)
+        # Patch length extending towards the center of the gate
+        pin = np.uint32(np.add(gw * 0.65, sw) + 0.5)
+        # Patch anchors offset along the sides
+        pofs = np.uint32(gws * 1.25 + 0.5)
+        # Patch anchors gap along the sides
+        pgap = np.uint32((glen - 2 * pofs) / 3.0 + 0.5)
+        # lateral skew along the sides
+        gskew = np.single([bb[1, 1] - bb[0, 1], bb[2, 0] - bb[1, 0], bb[2, 1] - bb[3, 1], bb[3, 0] - bb[0, 0]])
+        gskew *= 1.2 # we tend to underestamete the skes because we including not just checker-flag points
+        # Patch lateral offsets per/gap
+        plat = pgap * gskew / glen
+        # We want 4 patches per side
+        pi = np.arange(0, 4)
 
-        dcx1, dcy1 = 5*wx4, 5*wy4 # anchor placement of search roi's along the edge
-        dcx2, dcy2 = int((bx[1]-dcx1 -bx[0]-dcx1)/6), int((by[1]-dcy1 -by[0]-dcy1)/6)
-        lft = np.array([ [bx[0]    , bx[0]  , bx[0] , bx[0]]       , [by[0]+dcy1, cy+dcy2, cy-dcy2, by[1]-dcy1] ])
-        rht = np.array([ [bx[1]    , bx[1]  , bx[1] , bx[1]]       , [by[0]+dcy1, cy+dcy2, cy-dcy2, by[1]-dcy1] ])
-        top = np.array([ [bx[0]+dcx1, cx+dcx2, cx-dcx2, bx[1]-dcx1], [by[0]     , by[0]  , by[0]  , by[0]] ])
-        btm = np.array([ [bx[0]+dcx1, cx+dcx2, cx-dcx2, bx[1]-dcx1], [by[1]     , by[1]  , by[1]  , by[1]] ])
+        # Top anchors
+        px, py = np.int32(bb[0, 0] + pofs[0] + pi*pgap[0] +0.5) , np.int32(bb[0, 1] + pi*plat[0] +0.5)
+        top = np.array([px,py])
+        # Right hand side anchors
+        px, py = np.int32(bb[1, 0] + pi*plat[1] + 0.5), np.int32(bb[1, 1] + pofs[1] + pi*pgap[1] + 0.5)
+        rhs = np.array([px,py])
+        # Bottom anchors
+        px, py = np.int32(bb[3, 0] + pofs[2] + pi*pgap[2] +0.5) , np.int32(bb[3, 1] + pi*plat[2] +0.5)
+        btm = np.array([px,py])
+        # left hand side anchors
+        px, py = np.int32(bb[0, 0] + pi*plat[3] + 0.5), np.int32(bb[0, 1] + pofs[3] + pi*pgap[3] + 0.5)
+        lhs = np.array([px,py])
+
+        if False:
+#        if True:
+            plt_p = np.hstack((top, rhs, btm, lhs))
+            for i in range(plt_p.shape[1]):
+                plotcxy(plt_p[0, i], plt_p[1, i], color="Red", linewidth=2)
+            plt.imshow(gray, 'gray'), plt.show()
 
         patch = np.array([
-            [[lft[0,0] - vwxn, lft[0,0] + vwxp], [lft[1,0] - vwy, lft[1,0] + vwy]],
-            [[lft[0,1] - vwxn, lft[0,1] + vwxp], [lft[1,1] - vwy, lft[1,1] + vwy]],
-            [[lft[0,2] - vwxn, lft[0,2] + vwxp], [lft[1,2] - vwy, lft[1,2] + vwy]],
-            [[lft[0,3] - vwxn, lft[0,3] + vwxp], [lft[1,3] - vwy, lft[1,3] + vwy]],
-            [[rht[0,0] - vwxp, rht[0,0] + vwxn], [rht[1,0] - vwy, rht[1,0] + vwy]],
-            [[rht[0,1] - vwxp, rht[0,1] + vwxn], [rht[1,1] - vwy, rht[1,1] + vwy]],
-            [[rht[0,2] - vwxp, rht[0,2] + vwxn], [rht[1,2] - vwy, rht[1,2] + vwy]],
-            [[rht[0,3] - vwxp, rht[0,3] + vwxn], [rht[1,3] - vwy, rht[1,3] + vwy]],
-            [[top[0,0] - hwx, top[0,0] + hwx], [top[1,0] - hwyn, top[1,0] + hwyp]],
-            [[top[0,1] - hwx, top[0,1] + hwx], [top[1,1] - hwyn, top[1,1] + hwyp]],
-            [[top[0,2] - hwx, top[0,2] + hwx], [top[1,2] - hwyn, top[1,2] + hwyp]],
-            [[top[0,3] - hwx, top[0,3] + hwx], [top[1,3] - hwyn, top[1,3] + hwyp]],
-            [[btm[0,0] - hwx, btm[0,0] + hwx], [btm[1,0] - hwyp, btm[1,0] + hwyn]],
-            [[btm[0,1] - hwx, btm[0,1] + hwx], [btm[1,1] - hwyp, btm[1,1] + hwyn]],
-            [[btm[0,2] - hwx, btm[0,2] + hwx], [btm[1,2] - hwyp, btm[1,2] + hwyn]],
-            [[btm[0,3] - hwx, btm[0,3] + hwx], [btm[1,3] - hwyp, btm[1,3] + hwyn]] 
+            [[lhs[0,0] - pout[3], lhs[0,0] + pin[3]], [lhs[1,0] - pw[3], lhs[1,0] + pw[3]]],
+            [[lhs[0,1] - pout[3], lhs[0,1] + pin[3]], [lhs[1,1] - pw[3], lhs[1,1] + pw[3]]],
+            [[lhs[0,2] - pout[3], lhs[0,2] + pin[3]], [lhs[1,2] - pw[3], lhs[1,2] + pw[3]]],
+            [[lhs[0,3] - pout[3], lhs[0,3] + pin[3]], [lhs[1,3] - pw[3], lhs[1,3] + pw[3]]],
+            [[rhs[0,0] - pin[1], rhs[0,0] + pout[1]], [rhs[1,0] - pw[1], rhs[1,0] + pw[1]]],
+            [[rhs[0,1] - pin[1], rhs[0,1] + pout[1]], [rhs[1,1] - pw[1], rhs[1,1] + pw[1]]],
+            [[rhs[0,2] - pin[1], rhs[0,2] + pout[1]], [rhs[1,2] - pw[1], rhs[1,2] + pw[1]]],
+            [[rhs[0,3] - pin[1], rhs[0,3] + pout[1]], [rhs[1,3] - pw[1], rhs[1,3] + pw[1]]],
+            [[top[0,0] - pw[0], top[0,0] + pw[0]], [top[1,0] - pout[0], top[1,0] + pin[0]]],
+            [[top[0,1] - pw[0], top[0,1] + pw[0]], [top[1,1] - pout[0], top[1,1] + pin[0]]],
+            [[top[0,2] - pw[0], top[0,2] + pw[0]], [top[1,2] - pout[0], top[1,2] + pin[0]]],
+            [[top[0,3] - pw[0], top[0,3] + pw[0]], [top[1,3] - pout[0], top[1,3] + pin[0]]],
+            [[btm[0,0] - pw[2], btm[0,0] + pw[2]], [btm[1,0] - pin[2], btm[1,0] + pout[2]]],
+            [[btm[0,1] - pw[2], btm[0,1] + pw[2]], [btm[1,1] - pin[2], btm[1,1] + pout[2]]],
+            [[btm[0,2] - pw[2], btm[0,2] + pw[2]], [btm[1,2] - pin[2], btm[1,2] + pout[2]]],
+            [[btm[0,3] - pw[2], btm[0,3] + pw[2]], [btm[1,3] - pin[2], btm[1,3] + pout[2]]] 
             ])
 
         if False:
 #        if True:
-            pwx, pwy = wx * 4, wy * 4
+            pwx, pwy = int(3*gws[0]), int(3*gws[1])
+            bx,by = np.uint32([bb[0,0],bb[2,0]]), np.uint32([bb[0,1],bb[2,1]])
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
             plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
             plt.imshow(plt_g, 'gray'), plt.title(img_name)
-            plotbxy(bx-pbx[0], by-pby[0])
+
+            plt_x, plt_y = bb[:, 0]-pbx[0], bb[:, 1]-pby[0]
+            plt_x, plt_y = np.append(plt_x, plt_x[0]), np.append(plt_y, plt_y[0])
+            plt.plot(plt_x, plt_y, color="green", linewidth=2)
 
             for i in range(patch.shape[0]):
                 plotbxy(patch[i,0]-pbx[0], patch[i,1]-pby[0], color="Red")
 
-            plt_p = np.hstack((lft, rht, top, btm))
+            plt_p = np.hstack((lhs, rhs, top, btm))
             plt_p[0, :] -= pbx[0]
             plt_p[1, :] -= pby[0]
             for i in range(plt_p.shape[1]):
                 plotcxy(plt_p[0, i], plt_p[1, i], color="Red", linewidth=2)
             plt.show()
 
-##########//
-##########//
+######//
+######//
         side = 0  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 4):   # 0,1,2,3 patch within a side
             pn = 4*side + sn     # patch number
-            lft[0,sn], lft[1,sn] = find_gate_edge(lft[0,sn], lft[1,sn], patch[pn,0], patch[pn,1], gwx, img_dxNeg, img_dxPos, axis=0, posdir=True, gray=gray, img_name=img_name)
+            lhs[0,sn], lhs[1,sn] = find_gate_edge(lhs[0,sn], lhs[1,sn], patch[pn,0], patch[pn,1], gwx, img_dxNeg, img_dxPos, axis=0, posdir=True, gray=gray, img_name=img_name)
 
         side = 1  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 4):   # 0,1,2,3 patch within a side
             pn = 4*side + sn     # patch number
-            rht[0,sn], rht[1,sn] = find_gate_edge(rht[0,sn], rht[1,sn], patch[pn,0], patch[pn,1], gwx, img_dxPos, img_dxNeg, axis=0, posdir=False, gray=gray, img_name=img_name)
+            rhs[0,sn], rhs[1,sn] = find_gate_edge(rhs[0,sn], rhs[1,sn], patch[pn,0], patch[pn,1], gwx, img_dxPos, img_dxNeg, axis=0, posdir=False, gray=gray, img_name=img_name)
 
         side = 2  # 0=left, 1=right, 2=top, 3=bottom
         for sn in range(0, 4):   # 0,1,2,3 patch within a side
@@ -944,28 +1094,28 @@ def my_prediction(img, img_name= None):
             pn = 4*side + sn     # patch number
             btm[0,sn], btm[1,sn] = find_gate_edge(btm[0,sn], btm[1,sn], patch[pn,0], patch[pn,1], gwy, img_dyPos, img_dyNeg, axis=1, posdir=False, gray=gray, img_name=img_name)
 
-        lft_l = linefit(lft[1], lft[0]) # x = ay + b
-        rht_l = linefit(rht[1], rht[0])
+        lhs_l = linefit(lhs[1], lhs[0]) # x = ay + b
+        rhs_l = linefit(rhs[1], rhs[0])
         top_l = linefit(top[0], top[1]) # y = ax + b
         btm_l = linefit(btm[0], btm[1])
-        g1 = line_intersection(top_l, lft_l)
-        g2 = line_intersection(top_l, rht_l)
-        g3 = line_intersection(btm_l, rht_l)
-        g4 = line_intersection(btm_l, lft_l)
+        g1 = line_intersection(top_l, lhs_l)
+        g2 = line_intersection(top_l, rhs_l)
+        g3 = line_intersection(btm_l, rhs_l)
+        g4 = line_intersection(btm_l, lhs_l)
         bb = np.array([g1, g2, g3, g4])
 
-##xx        if False:
-        if True:
-            pwx, pwy = wx * 4, wy * 4
+        if False:
+#        if True: ##
+            pwx, pwy = int(3*gws[0]), int(3*gws[1])
+            bx,by = np.uint32([bb[0,0],bb[2,0]]), np.uint32([bb[0,1],bb[2,1]])
             pbx, pby = [max(0, bx[0]-pwx), min(gray.shape[1], bx[1]+pwx)], [max(0, by[0]-pwy), min(gray.shape[0], by[1]+pwy)]
             plt_g = gray[pby[0]:pby[1], pbx[0]:pbx[1]]
             plt.imshow(plt_g, 'gray'), plt.title(img_name)
-            plotbxy(bx - pbx[0], by - pby[0])
             
             for i in range(patch.shape[0]):
                 plotbxy(patch[i, 0]-pbx[0], patch[i, 1]-pby[0], color="Red")
 
-            plt_p = np.hstack((lft, rht, top, btm))
+            plt_p = np.hstack((lhs, rhs, top, btm))
             plt_p[0, :] -= pbx[0]
             plt_p[1, :] -= pby[0]
             for i in range(plt_p.shape[1]):
@@ -982,7 +1132,7 @@ def my_prediction(img, img_name= None):
 
     else:
         #print("TODO: Just use the ROI ##//")
-        bb = np.array([ [bx[0], by[0]], [bx[1], by[0]], [bx[1], by[1]], [bx[0], by[1]] ])
+        bb = bb
     ### Find the exact gate corner positions by analyzing the sobel'd image
 
 ##xx    dbg_show = True
